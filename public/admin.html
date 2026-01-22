@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Veil - 管理控制台</title>
+    <title>Veil - 管理控制�?/title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="/css/styles.css">
     <style>
-        /* 防止加载时黑闪 */
+        /* 防止加载时黑�?*/
         body.app-mode { background-color: #EEF0F2; }
     </style>
 </head>
@@ -19,7 +19,7 @@
 
     <div id="app-view" style="opacity: 1; transform: none; filter: none; pointer-events: auto;">
         <div class="app-window">
-            <!-- 侧边栏 -->
+            <!-- 侧边�?-->
             <aside class="sidebar">
                 <div class="brand">
                     <div class="brand-icon">
@@ -36,14 +36,14 @@
                         <i class="ph ph-users" style="font-size: 18px;"></i> 用户管理
                     </li>
                     <li class="nav-item" onclick="switchView('all-emails', this)">
-                        <i class="ph ph-list" style="font-size: 18px;"></i> 所有邮箱
+                        <i class="ph ph-list" style="font-size: 18px;"></i> 所有邮�?
                     </li>
                 </ul>
 
                 <div class="user-profile-container">
                     <div class="user-menu" id="userMenu">
                         <div class="menu-item">
-                            <i class="ph-bold ph-sign-out"></i> 退出登录
+                            <i class="ph-bold ph-sign-out"></i> 退出登�?
                         </div>
                     </div>
                     <div class="user-profile">
@@ -58,7 +58,7 @@
 
             <!-- 主内容区 -->
             <main class="main-content">
-                <!-- 移动端头部 -->
+                <!-- 移动端头�?-->
                 <div class="mobile-header" style="display: none;">
                     <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.add('open'); document.querySelector('.sidebar-overlay').classList.add('show');">
                         <i class="ph ph-list"></i>
@@ -75,7 +75,7 @@
                 <!-- 视图1: 生成邮箱 -->
                 <div id="view-home" class="view-section active">
                     <header class="toolbar">
-                        <a href="https://github.com/li3112522-ops/Veil" class="github-pill" target="_blank">
+                        <a href="https://github.com/li3112522-ops/veil" class="github-pill" target="_blank">
                             <i class="ph-fill ph-github-logo"></i>
                             <span>GitHub</span>
                         </a>
@@ -86,13 +86,13 @@
                             <div class="current-email" id="fullEmailDisplay">
                                 <span id="prefixText"></span><span id="suffixText" style="color:var(--label-secondary);"></span>
                             </div>
-                            <div class="click-hint">点击查看收件箱</div>
+                            <div class="click-hint">点击查看收件�?/div>
                         </div>
 
                         <div class="actions-row disabled" id="actionButtons">
                             <button class="btn btn-secondary" onclick="copyEmail()"><i class="ph-bold ph-copy"></i> <span>复制</span></button>
                             <button class="btn btn-secondary" onclick="refreshInbox()"><i class="ph-bold ph-arrows-clockwise"></i> <span>刷新</span></button>
-                            <button class="btn btn-primary" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发送</span></button>
+                            <button class="btn btn-primary" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发�?/span></button>
                             <button class="btn btn-danger" onclick="confirmClearInbox()"><i class="ph-bold ph-trash"></i> <span>清空</span></button>
                         </div>
 
@@ -103,7 +103,7 @@
                                     <div style="font-size:13px; margin-bottom:6px; font-weight:500;">域名后缀</div>
                                     <div class="custom-select-wrapper">
                                         <div class="select-trigger" onclick="toggleDropdown()">
-                                            <span id="selectedDomain">加载中...</span>
+                                            <span id="selectedDomain">加载�?..</span>
                                             <i class="ph-bold ph-caret-down" style="color:#86868B;"></i>
                                         </div>
                                         <ul class="options-list" id="domainOptions"></ul>
@@ -114,7 +114,7 @@
                                         <div class="segment-bg" id="segmentBg"></div>
                                         <button class="segment-btn active" onclick="setPrefixMode(this, 'random', 0)">随机</button>
                                         <button class="segment-btn" onclick="setPrefixMode(this, 'name', 1)">人名</button>
-                                        <button class="segment-btn" onclick="setPrefixMode(this, 'custom', 2)">自定义</button>
+                                        <button class="segment-btn" onclick="setPrefixMode(this, 'custom', 2)">自定�?/button>
                                     </div>
 
                                     <input type="text" class="custom-input" id="customInputBox" placeholder="输入自定义前缀...">
@@ -136,12 +136,12 @@
                             <div class="panel-group">
                                 <div style="display:flex; justify-content:space-between; align-items:center; padding:0 16px;">
                                     <div class="group-header" style="padding:0;">历史邮箱</div>
-                                    <i class="ph ph-trash" onclick="confirmClearHistory()" style="font-size:14px; color:var(--label-secondary); cursor:pointer;" title="清空所有"></i>
+                                    <i class="ph ph-trash" onclick="confirmClearHistory()" style="font-size:14px; color:var(--label-secondary); cursor:pointer;" title="清空所�?></i>
                                 </div>
                                 <div class="ios-card" style="padding: 10px 20px;">
                                     <div class="history-list" id="historyListContainer">
                                         <div style="text-align:center; padding: 20px; color:var(--label-tertiary); font-size:13px;">
-                                            加载中...
+                                            加载�?..
                                         </div>
                                     </div>
                                 </div>
@@ -150,12 +150,12 @@
 
                         <div class="inbox-section" id="inboxSection">
                             <div class="inbox-header">
-                                <div class="inbox-title"><span class="status-dot"></span> 收件箱</div>
-                                <div style="font-size:13px; color:var(--label-secondary);">监听中</div>
+                                <div class="inbox-title"><span class="status-dot"></span> 收件�?/div>
+                                <div style="font-size:13px; color:var(--label-secondary);">监听�?/div>
                             </div>
                             <div id="inboxContainer" class="inbox-empty">
                                 <i class="ph ph-tray"></i>
-                                <span>暂无新邮件</span>
+                                <span>暂无新邮�?/span>
                             </div>
                         </div>
                     </div>
@@ -184,28 +184,28 @@
                                 <div>发件权限</div>
                                 <div>邮箱配额</div>
                                 <div>用户角色</div>
-                                <div>账户状态</div>
+                                <div>账户状�?/div>
                                 <div>操作</div>
                                 <div></div>
                             </div>
                             <div id="userTableBody">
-                                <div style="padding: 40px; text-align: center; color: #999;">加载中...</div>
+                                <div style="padding: 40px; text-align: center; color: #999;">加载�?..</div>
                             </div>
                         </div>
 
                         <div class="batch-bar" id="userBatchBar">
-                            <div class="batch-info">已选择 <span id="selectedUsersCount">0</span> 位用户</div>
+                            <div class="batch-info">已选择 <span id="selectedUsersCount">0</span> 位用�?/div>
                             <button class="batch-btn danger" onclick="batchDeleteUsers()"><i class="ph-bold ph-trash"></i> 批量删除</button>
                             <button class="batch-btn" style="opacity: 0.7; margin-left: 8px;" onclick="cancelUserSelection()"><i class="ph-bold ph-x"></i> 取消</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- 视图3: 所有邮箱 -->
+                <!-- 视图3: 所有邮�?-->
                 <div id="view-all-emails" class="view-section">
                     <div class="module-header">
                         <div class="module-title">
-                            <h1>所有邮箱</h1>
+                            <h1>所有邮�?/h1>
                             <p>管理系统中所有生成的邮箱账号</p>
                         </div>
                         <div class="filter-row">
@@ -227,18 +227,18 @@
                                 </div>
                                 <div>邮箱地址</div>
                                 <div>登录密码</div>
-                                <div>登录状态</div>
+                                <div>登录状�?/div>
                                 <div>创建时间</div>
                                 <div style="text-align: right;">操作</div>
                             </div>
                             <div id="emailListBody">
-                                <div style="padding: 40px; text-align: center; color: #999;">加载中...</div>
+                                <div style="padding: 40px; text-align: center; color: #999;">加载�?..</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="batch-bar" id="emailBatchBar">
-                        <div class="batch-info">已选择 <span id="selectedEmailsCount">0</span> 项</div>
+                        <div class="batch-info">已选择 <span id="selectedEmailsCount">0</span> �?/div>
                         <button class="batch-btn" onclick="batchToggleLoginEmails(true)"><i class="ph-bold ph-check-circle"></i> 允许登录</button>
                         <button class="batch-btn" onclick="batchToggleLoginEmails(false)"><i class="ph-bold ph-prohibit"></i> 禁止登录</button>
                         <button class="batch-btn danger" onclick="batchDeleteEmails()"><i class="ph-bold ph-trash"></i> 删除</button>
@@ -257,8 +257,8 @@
         <div class="sheet-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeSendModal()">取消</button>
-                <div style="font-weight:600; font-size:16px;">新邮件</div>
-                <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发送</button>
+                <div style="font-weight:600; font-size:16px;">新邮�?/div>
+                <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发�?/button>
             </div>
             <div class="sheet-body">
                 <div class="compose-field">
@@ -266,7 +266,7 @@
                     <input type="text" class="compose-input" id="senderNameInput" placeholder="例如: Veil" oninput="checkComposeInput()">
                 </div>
                 <div class="compose-field">
-                    <span class="compose-label">收件人:</span>
+                    <span class="compose-label">收件�?</span>
                     <input type="text" class="compose-input" id="toInput" placeholder="recipient@example.com" oninput="checkComposeInput()">
                 </div>
                 <div class="compose-field">
@@ -292,7 +292,7 @@
                     <div class="mail-detail-avatar" id="mailDetailAvatar"></div>
                     <div class="mail-detail-info">
                         <div class="mail-detail-from" id="mailDetailFrom"></div>
-                        <div class="mail-detail-to">收件人: <span id="mailDetailTo"></span></div>
+                        <div class="mail-detail-to">收件�? <span id="mailDetailTo"></span></div>
                     </div>
                     <div class="mail-detail-time" id="mailDetailTime"></div>
                 </div>
@@ -307,13 +307,13 @@
             <div class="sheet-header mailbox-viewer-header">
                 <button class="sheet-btn" onclick="closeMailboxViewer()">关闭</button>
                 <div class="viewer-title">
-                    <div style="font-weight:600; font-size:16px;">收件箱</div>
+                    <div style="font-weight:600; font-size:16px;">收件�?/div>
                     <div class="viewer-address" id="mailboxViewerAddress"></div>
                 </div>
                 <button class="sheet-btn" onclick="refreshMailboxViewer()">刷新</button>
             </div>
             <div class="mailbox-viewer-body">
-                <div class="viewer-meta" id="mailboxViewerCount">加载中...</div>
+                <div class="viewer-meta" id="mailboxViewerCount">加载�?..</div>
                 <div id="mailboxViewerList" class="mailbox-viewer-list"></div>
             </div>
         </div>
@@ -331,7 +331,7 @@
 
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                 <div class="form-row">
-                    <label class="form-label">登录用户名</label>
+                    <label class="form-label">登录用户�?/label>
                     <input type="text" class="form-input" id="inputLoginUsername" placeholder="请输入用户名">
                 </div>
                 <div class="form-row">
@@ -348,16 +348,16 @@
                 <div class="form-row">
                     <label class="form-label">用户角色</label>
                     <select class="form-input" id="inputRole">
-                        <option value="User">普通用户</option>
-                        <option value="Admin">管理员</option>
+                        <option value="User">普通用�?/option>
+                        <option value="Admin">管理�?/option>
                     </select>
                 </div>
             </div>
 
             <div class="form-row" style="display:flex; justify-content:space-between; align-items:center; background:#F9F9F9; padding:12px; border-radius:8px;">
                 <div>
-                    <div style="font-size:14px; font-weight:500;">允许发送邮件</div>
-                    <div style="font-size:12px; color:#3C3C4399;">开启后该用户可发送邮件</div>
+                    <div style="font-size:14px; font-weight:500;">允许发送邮�?/div>
+                    <div style="font-size:12px; color:#3C3C4399;">开启后该用户可发送邮�?/div>
                 </div>
                 <div class="ios-switch" id="inputSendSwitch" onclick="this.classList.toggle('on')">
                     <div class="ios-switch-thumb"></div>
@@ -365,7 +365,7 @@
             </div>
 
             <div class="form-row" id="initialEmailRow">
-                <label class="form-label">初始邮箱 (可选)</label>
+                <label class="form-label">初始邮箱 (可�?</label>
                 <div class="input-group">
                     <input type="text" class="form-input" id="inputInitialEmail" placeholder="邮箱前缀" style="text-align:right;">
                     <span class="input-addon">@</span>
@@ -386,8 +386,8 @@
     <!-- 分配邮箱模态框 -->
     <div class="modal-overlay" id="assignEmailModal">
         <div class="modal-card">
-            <h3 style="font-size:18px; font-weight:700; margin-bottom:20px;">分配新邮箱</h3>
-            <p style="font-size:14px; color:#3C3C4399; margin-bottom:20px;">手动指定该用户的新邮箱地址。</p>
+            <h3 style="font-size:18px; font-weight:700; margin-bottom:20px;">分配新邮�?/h3>
+            <p style="font-size:14px; color:#3C3C4399; margin-bottom:20px;">手动指定该用户的新邮箱地址�?/p>
 
             <div class="form-row">
                 <label class="form-label">邮箱地址</label>
@@ -412,11 +412,11 @@
         <div class="modal-card" style="width: 400px;">
             <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">修改密码</h3>
             <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
-                当前正在修改 <span id="pwdEditEmail" style="color: var(--accent-blue); font-weight: 500;"></span> 的密码。
+                当前正在修改 <span id="pwdEditEmail" style="color: var(--accent-blue); font-weight: 500;"></span> 的密码�?
             </p>
 
-            <label style="font-size: 13px; font-weight: 600; color: #333;">新密码</label>
-            <input type="password" class="form-input" id="newPasswordInput" placeholder="输入新密码">
+            <label style="font-size: 13px; font-weight: 600; color: #333;">新密�?/label>
+            <input type="password" class="form-input" id="newPasswordInput" placeholder="输入新密�?>
             <div style="font-size: 12px; color: #999; margin-top: 6px; display: flex; align-items: center; gap: 4px;">
                 <i class="ph-fill ph-info"></i> 默认密码通常为邮箱地址本身
             </div>
@@ -428,12 +428,12 @@
         </div>
     </div>
 
-    <!-- iOS 确认框 -->
+    <!-- iOS 确认�?-->
     <div class="modal-overlay" id="iosAlertModal">
         <div class="ios-alert-box">
             <div class="ios-alert-content">
                 <h3 id="iosAlertTitle" class="ios-alert-title">确认操作</h3>
-                <p id="iosAlertDesc" class="ios-alert-desc">确定要继续吗？</p>
+                <p id="iosAlertDesc" class="ios-alert-desc">确定要继续吗�?/p>
             </div>
             <div class="ios-alert-buttons">
                 <button class="ios-alert-btn cancel">取消</button>
@@ -445,7 +445,7 @@
     <script type="module" src="/js/admin.js"></script>
 
     <style>
-        /* 移动端显示头部 */
+        /* 移动端显示头�?*/
         @media (max-width: 768px) {
             .mobile-header { display: flex !important; }
         }
