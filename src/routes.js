@@ -1,6 +1,7 @@
 import { handleApiRequest, handleEmailReceive } from './apiHandlers.js';
 import { createJwt, verifyJwt, buildSessionCookie, verifyMailboxLogin } from './authentication.js';
 import { extractEmail } from './commonUtils.js';
+import { getTotalMailboxCount } from './database.js';
 import { getDatabaseWithValidation } from './dbConnectionHelper.js';
 
 /**
@@ -413,23 +414,68 @@ export function createRouter() {
   });
 
   router.get('/api/session', async (context) => {
-    const { request, env, authPayload } = context;
+    const { env, authPayload } = context;
     const ADMIN_NAME = String(env.ADMIN_NAME || 'admin').trim().toLowerCase();
-    
+
     if (!authPayload) {
       return new Response('Unauthorized', { status: 401 });
     }
-    
-    const strictAdmin = (authPayload.role === 'admin') && (
-      String(authPayload.username || '').trim().toLowerCase() === ADMIN_NAME || 
-      String(authPayload.username || '') === '__root__'
+
+    const role = authPayload.role || 'admin';
+    const username = authPayload.username || '';
+    const strictAdmin = (role === 'admin') && (
+      String(username || '').trim().toLowerCase() === ADMIN_NAME ||
+      String(username || '') === '__root__'
     );
-    
-    return Response.json({ 
-      authenticated: true, 
-      role: authPayload.role || 'admin', 
-      username: authPayload.username || '', 
-      strictAdmin 
+
+    let userId = Number(authPayload.userId || 0);
+    let canSend = 0;
+    let mailboxLimit = 0;
+    let quotaUsed = 0;
+    const mailboxAddress = authPayload.mailboxAddress || null;
+
+    try {
+      const DB = await getDatabaseWithValidation(env);
+
+      if (role === 'admin') {
+        canSend = 1;
+        if (strictAdmin) {
+          mailboxLimit = 999999;
+          quotaUsed = await getTotalMailboxCount(DB);
+        } else if (userId) {
+          const { getCachedUserQuota } = await import('./cacheHelper.js');
+          const quota = await getCachedUserQuota(DB, userId);
+          mailboxLimit = quota.limit;
+          quotaUsed = quota.used;
+        }
+      } else if (role === 'user') {
+        if (userId) {
+          const { getCachedUserQuota } = await import('./cacheHelper.js');
+          const quota = await getCachedUserQuota(DB, userId);
+          mailboxLimit = quota.limit;
+          quotaUsed = quota.used;
+          const info = await DB.prepare('SELECT can_send FROM users WHERE id = ? LIMIT 1').bind(userId).all();
+          canSend = info?.results?.[0]?.can_send ? 1 : 0;
+        }
+      } else if (role === 'mailbox') {
+        mailboxLimit = 1;
+        quotaUsed = 1;
+      }
+    } catch (_) {
+      // ignore and fallback to defaults
+    }
+
+    return Response.json({
+      authenticated: true,
+      role,
+      username,
+      strictAdmin,
+      user_id: userId,
+      userId,
+      can_send: canSend,
+      mailbox_limit: mailboxLimit,
+      quota_used: quotaUsed,
+      mailbox_address: mailboxAddress
     });
   });
 

@@ -86,17 +86,6 @@ export function startAurora(canvasId = 'aurora-canvas') {
     window.addEventListener('resize', initCanvas);
 }
 
-export function stopAurora() {
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-}
-
-export function restartAurora() {
-    initCanvas();
-    animate();
-}
 
 // ============================================
 // 3D 卡片效果
@@ -132,10 +121,4 @@ export function initCard3D(cardId = 'loginCard') {
     });
 
     animateCard();
-}
-
-export function restartCard3D() {
-    if (card) {
-        animateCard();
-    }
 }

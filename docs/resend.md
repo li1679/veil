@@ -9,32 +9,12 @@
 - 登录 Resend 后台，进入 Domains，点击 Add Domain。
 - 按向导添加你的发件域名，并在 DNS 处添加相应记录，待验证通过。
 
-示意图（流程参考）：
-
-![在 Resend 添加域名 1](../pic/resend/2adddomain1.png)
-
-![在 Resend 添加域名 2](../pic/resend/2adddomain2.png)
-
-![在 Resend 添加域名 3](../pic/resend/2adddomain3.png)
-
-![在 Resend 添加域名 4](../pic/resend/2adddomain4.png)
-
-![在 Resend 添加域名 5](../pic/resend/2adddomain5.png)
-
 完成后，确保域名状态为 Verified。发件地址必须使用该已验证域名，例如：`no-reply@yourdomain.com`。
 
 ## 2. 创建 Resend API Key
 
 - 进入 Resend → API Keys，点击 Create API Key。
 - 建议选择可读写权限（Emails: send/read/update），并妥善保存生成的 Key。
-
-参考截图：
-
-![创建 API Key 1](../pic/resend/createapikey1.png)
-
-![创建 API Key 2](../pic/resend/createapikey2.png)
-
-![创建 API Key 3](../pic/resend/createapikey3.png)
 
 ## 3. 在 Cloudflare Workers 配置变量
 

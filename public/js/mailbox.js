@@ -4,7 +4,7 @@
  */
 
 import { mailboxUserAPI } from './api.js';
-import { requireMailboxUser, logout, getCurrentUser, canSend } from './auth.js';
+import { requireMailboxUser, logout, canSend } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, initCommon,
     formatTime, extractCode, escapeHtml
@@ -121,7 +121,7 @@ function renderInbox(emails) {
         container.innerHTML = `
             <div class="inbox-empty">
                 <i class="ph ph-tray"></i>
-                <span>?????</span>
+                <span>暂无新邮件</span>
             </div>
         `;
         return;
@@ -129,7 +129,7 @@ function renderInbox(emails) {
 
     container.innerHTML = currentInboxEmails.map(email => {
         const fromRaw = email.from_name || email.from_address || 'U';
-        const subjectRaw = email.subject || '(???)';
+        const subjectRaw = email.subject || '(无主题)';
         const previewRaw = getEmailPreviewText(email).slice(0, 120);
         const avatarChar = String(fromRaw || 'U').trim().charAt(0).toUpperCase();
         return `
@@ -144,10 +144,10 @@ function renderInbox(emails) {
                     <div class="mail-preview">${escapeHtml(previewRaw)}</div>
                 </div>
                 <div class="mail-actions">
-                    <button class="action-btn" onclick="copyEmailCode(event, ${email.id})" title="?????">
+                    <button class="action-btn" onclick="copyEmailCode(event, ${email.id})" title="复制验证码">
                         <i class="ph-bold ph-copy"></i>
                     </button>
-                    <button class="action-btn delete" onclick="deleteEmailItem(event, ${email.id})" title="????">
+                    <button class="action-btn delete" onclick="deleteEmailItem(event, ${email.id})" title="删除邮件">
                         <i class="ph-bold ph-trash"></i>
                     </button>
                 </div>
@@ -164,7 +164,7 @@ window.copyEmailCode = function(event, id) {
     const email = getInboxEmailById(id);
     const code = getEmailVerificationCode(email);
     if (!code) {
-        showToast('??????');
+        showToast('无法复制');
         return;
     }
     copyText(code);
@@ -177,10 +177,10 @@ window.deleteEmailItem = async function(event, id) {
     }
     try {
         await mailboxUserAPI.deleteEmail(id);
-        showToast('???');
+        showToast('已删除');
         await loadInbox();
     } catch (error) {
-        showToast(error.message || '????');
+        showToast(error.message || '删除失败');
     }
 };
 

@@ -3,8 +3,8 @@
  * 只有生成邮箱功能
  */
 
-import { domainAPI, mailboxAPI, emailAPI } from './api.js';
-import { requireUser, logout, getCurrentUser, canSend } from './auth.js';
+import { domainAPI, mailboxAPI, emailAPI, quotaAPI } from './api.js';
+import { requireUser, logout, canSend } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, openIOSAlert,
     animateDelete, initCommon, formatTime, extractCode, escapeHtml
@@ -41,6 +41,7 @@ async function init() {
 
     // 更新用户信息
     updateUserInfo();
+    await refreshQuota();
 
     // 加载域名列表
     await loadDomains();
@@ -68,6 +69,20 @@ function updateUserInfo() {
     }
     if (quotaEl && currentUser) {
         quotaEl.textContent = `已生成 ${currentUser.quotaUsed || 0}/${currentUser.quota || 10} 个邮箱`;
+    }
+}
+
+async function refreshQuota() {
+    if (!currentUser) return;
+    try {
+        const quota = await quotaAPI.get();
+        if (quota && typeof quota.used !== 'undefined') {
+            currentUser.quotaUsed = quota.used;
+            currentUser.quota = quota.limit;
+            updateUserInfo();
+        }
+    } catch (error) {
+        console.error('Failed to refresh quota:', error);
     }
 }
 
@@ -154,7 +169,8 @@ window.updateLengthLabel = function(val) {
 // ============================================
 window.generateEmail = async function() {
     // 检查配额
-    if (currentUser && currentUser.quotaUsed >= currentUser.quota) {
+    await refreshQuota();
+    if (currentUser && (currentUser.quotaUsed || 0) >= (currentUser.quota || 10)) {
         showToast('邮箱配额已用完');
         return;
     }
@@ -184,6 +200,7 @@ window.generateEmail = async function() {
                 currentUser.quotaUsed = (currentUser.quotaUsed || 0) + 1;
                 updateUserInfo();
             }
+            refreshQuota();
         }
     } catch (error) {
         console.error('Generate failed:', error);
@@ -299,6 +316,11 @@ window.confirmDeleteHistory = function(id) {
                     }
                 });
                 showToast('已删除');
+                if (currentUser) {
+                    currentUser.quotaUsed = Math.max(0, (currentUser.quotaUsed || 0) - 1);
+                    updateUserInfo();
+                }
+                refreshQuota();
             } catch (error) {
                 showToast(error.message || '删除失败');
             }
@@ -318,6 +340,11 @@ window.confirmClearHistory = function() {
             stopInboxPoll();
             renderHistory();
             showToast('已清空');
+            if (currentUser) {
+                currentUser.quotaUsed = 0;
+                updateUserInfo();
+            }
+            refreshQuota();
         } catch (error) {
             showToast(error.message || '清空失败');
         }
@@ -398,7 +425,7 @@ function renderInbox(emails) {
         container.innerHTML = `
             <div class="inbox-empty">
                 <i class="ph ph-tray"></i>
-                <span>?????</span>
+                <span>暂无新邮件</span>
             </div>
         `;
         return;
@@ -406,7 +433,7 @@ function renderInbox(emails) {
 
     container.innerHTML = currentInboxEmails.map(email => {
         const fromRaw = email.from_name || email.from_address || 'U';
-        const subjectRaw = email.subject || '(???)';
+        const subjectRaw = email.subject || '(无主题)';
         const previewRaw = getEmailPreviewText(email).slice(0, 120);
         const avatarChar = String(fromRaw || 'U').trim().charAt(0).toUpperCase();
         return `
@@ -421,10 +448,10 @@ function renderInbox(emails) {
                     <div class="mail-preview">${escapeHtml(previewRaw)}</div>
                 </div>
                 <div class="mail-actions">
-                    <button class="action-btn" onclick="copyEmailCode(event, ${email.id})" title="?????">
+                    <button class="action-btn" onclick="copyEmailCode(event, ${email.id})" title="复制验证码">
                         <i class="ph-bold ph-copy"></i>
                     </button>
-                    <button class="action-btn delete" onclick="deleteEmailItem(event, ${email.id})" title="????">
+                    <button class="action-btn delete" onclick="deleteEmailItem(event, ${email.id})" title="删除邮件">
                         <i class="ph-bold ph-trash"></i>
                     </button>
                 </div>
@@ -441,7 +468,7 @@ window.copyEmailCode = function(event, id) {
     const email = getInboxEmailById(id);
     const code = getEmailVerificationCode(email);
     if (!code) {
-        showToast('??????');
+        showToast('无法复制');
         return;
     }
     copyText(code);
@@ -454,10 +481,10 @@ window.deleteEmailItem = async function(event, id) {
     }
     try {
         await emailAPI.delete(id);
-        showToast('???');
+        showToast('已删除');
         await loadInbox();
     } catch (error) {
-        showToast(error.message || '????');
+        showToast(error.message || '删除失败');
     }
 };
 

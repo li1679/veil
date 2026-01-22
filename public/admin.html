@@ -301,6 +301,24 @@
         </div>
     </div>
 
+    <!-- 邮箱收件箱查看器 -->
+    <div class="modal-overlay" id="mailboxViewerModal">
+        <div class="sheet-modal mailbox-viewer-modal">
+            <div class="sheet-header mailbox-viewer-header">
+                <button class="sheet-btn" onclick="closeMailboxViewer()">关闭</button>
+                <div class="viewer-title">
+                    <div style="font-weight:600; font-size:16px;">收件箱</div>
+                    <div class="viewer-address" id="mailboxViewerAddress"></div>
+                </div>
+                <button class="sheet-btn" onclick="refreshMailboxViewer()">刷新</button>
+            </div>
+            <div class="mailbox-viewer-body">
+                <div class="viewer-meta" id="mailboxViewerCount">加载中...</div>
+                <div id="mailboxViewerList" class="mailbox-viewer-list"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- 用户编辑模态框 -->
     <div class="modal-overlay" id="userModal">
         <div class="modal-card">

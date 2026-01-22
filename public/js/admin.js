@@ -4,11 +4,11 @@
  */
 
 import { domainAPI, mailboxAPI, emailAPI, userAPI, adminMailboxAPI } from './api.js';
-import { requireAdmin, logout, getCurrentUser, canSend } from './auth.js';
+import { requireAdmin, logout, canSend } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, openIOSAlert,
     animateDelete, animateBatchDelete, toggleUserMenu, initCommon,
-    formatTime, formatDate, extractCode, getStorage, setStorage, escapeHtml
+    formatTime, formatDate, extractCode, escapeHtml
 } from './common.js';
 
 // ============================================
@@ -23,6 +23,8 @@ let users = [];
 let allMailboxes = [];
 let selectedUserIds = new Set();
 let selectedEmailIds = new Set();
+let viewerMailbox = null;
+let viewerEmails = [];
 
 // 配置
 let prefixMode = 'random';
@@ -46,6 +48,7 @@ async function init() {
 
     // 设置用户信息
     updateUserInfo();
+    applyUserManagementAccessUI();
 
     // 加载域名列表
     await loadDomains();
@@ -79,6 +82,23 @@ function updateUserInfo() {
     }
     if (badgeEl && currentUser) {
         badgeEl.textContent = currentUser.role === 'StrictAdmin' ? 'Super Admin' : 'Admin';
+    }
+}
+
+function applyUserManagementAccessUI() {
+    const canManage = canManageUsers();
+    const actionBar = document.querySelector('#view-users .actions');
+    if (actionBar) {
+        actionBar.style.display = canManage ? '' : 'none';
+    }
+    const selectAll = document.getElementById('selectAllUsersCheckbox');
+    if (selectAll) {
+        if (canManage) {
+            selectAll.classList.remove('disabled');
+        } else {
+            selectAll.classList.add('disabled');
+            selectAll.classList.remove('checked');
+        }
     }
 }
 
@@ -226,7 +246,7 @@ function setCurrentEmail(email) {
 // ============================================
 async function loadHistory() {
     try {
-        const response = await mailboxAPI.getMailboxes();
+        const response = await mailboxAPI.getMailboxes({ scope: 'own' });
         emailHistory = (response.mailboxes || []).map(m => ({
             id: m.id,
             email: m.address,
@@ -335,7 +355,7 @@ window.confirmClearHistory = function() {
     if (emailHistory.length === 0) return;
     openIOSAlert('清空历史', '确定删除所有记录吗？', async () => {
         try {
-            await mailboxAPI.clearAll();
+            await mailboxAPI.clearAll({ scope: 'own' });
             emailHistory = [];
             currentEmail = null;
             document.getElementById('fullEmailDisplay').classList.remove('visible');
@@ -424,7 +444,7 @@ function renderInbox(emails) {
         container.innerHTML = `
             <div class="inbox-empty">
                 <i class="ph ph-tray"></i>
-                <span>?????</span>
+                <span>暂无新邮件</span>
             </div>
         `;
         return;
@@ -432,7 +452,7 @@ function renderInbox(emails) {
 
     container.innerHTML = currentInboxEmails.map(email => {
         const fromRaw = email.from_name || email.from_address || 'U';
-        const subjectRaw = email.subject || '(???)';
+        const subjectRaw = email.subject || '(无主题)';
         const previewRaw = getEmailPreviewText(email).slice(0, 120);
         const avatarChar = String(fromRaw || 'U').trim().charAt(0).toUpperCase();
         return `
@@ -447,10 +467,10 @@ function renderInbox(emails) {
                     <div class="mail-preview">${escapeHtml(previewRaw)}</div>
                 </div>
                 <div class="mail-actions">
-                    <button class="action-btn" onclick="copyEmailCode(event, ${email.id})" title="?????">
+                    <button class="action-btn" onclick="copyEmailCode(event, ${email.id})" title="复制验证码">
                         <i class="ph-bold ph-copy"></i>
                     </button>
-                    <button class="action-btn delete" onclick="deleteEmailItem(event, ${email.id})" title="????">
+                    <button class="action-btn delete" onclick="deleteEmailItem(event, ${email.id})" title="删除邮件">
                         <i class="ph-bold ph-trash"></i>
                     </button>
                 </div>
@@ -467,7 +487,7 @@ window.copyEmailCode = function(event, id) {
     const email = getInboxEmailById(id);
     const code = getEmailVerificationCode(email);
     if (!code) {
-        showToast('??????');
+        showToast('无法复制');
         return;
     }
     copyText(code);
@@ -480,10 +500,10 @@ window.deleteEmailItem = async function(event, id) {
     }
     try {
         await emailAPI.delete(id);
-        showToast('???');
+        showToast('已删除');
         await loadInbox();
     } catch (error) {
-        showToast(error.message || '????');
+        showToast(error.message || '删除失败');
     }
 };
 
@@ -578,10 +598,43 @@ window.doSendEmail = async function() {
 // ============================================
 // 用户管理
 // ============================================
+function canManageUsers() {
+    return currentUser && currentUser.role === 'StrictAdmin';
+}
+
+function isLockedUser(user) {
+    return !!user?.is_super_admin;
+}
+
+function normalizeUserList(list) {
+    const normalized = (list || []).map(user => ({
+        ...user,
+        is_super_admin: Boolean(user?.is_super_admin),
+    }));
+    const superAdmins = normalized.filter(user => user.is_super_admin);
+    const others = normalized.filter(user => !user.is_super_admin);
+    return [...superAdmins, ...others];
+}
+
+function ensureManageAccess(user = null) {
+    if (!canManageUsers()) {
+        showToast('无权限');
+        return false;
+    }
+    if (user && isLockedUser(user)) {
+        showToast('超级管理员不可修改');
+        return false;
+    }
+    return true;
+}
+
 async function loadUsers() {
     try {
         const response = await userAPI.getUsers();
-        users = response.users || [];
+        users = normalizeUserList(response.users || []);
+        if (!canManageUsers()) {
+            selectedUserIds.clear();
+        }
         renderUserTable();
     } catch (error) {
         console.error('Failed to load users:', error);
@@ -601,32 +654,81 @@ function renderUserTable() {
     }
 
     container.innerHTML = users.map(user => {
+        const canManage = canManageUsers();
+        const locked = isLockedUser(user);
+        const selectable = canManage && !locked;
         const subEmails = user.mailboxes || [];
         const used = subEmails.length;
-        const percentage = Math.min((used / (user.quota || 10)) * 100, 100);
+        const quotaLimit = locked ? '∞' : (user.quota || 10);
+        const percentage = locked ? 100 : Math.min((used / (user.quota || 10)) * 100, 100);
+        if (locked) {
+            selectedUserIds.delete(user.id);
+        }
         const isSelected = selectedUserIds.has(user.id);
+        const roleLabel = locked ? 'Super Admin' : user.role;
 
         const subEmailsHTML = subEmails.length === 0
             ? '<div style="padding:10px; color:#999; font-size:13px; text-align:center;">暂无分配邮箱</div>'
-            : subEmails.map(mail => `
-                <div class="email-item" id="email-item-${mail.id}">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <i class="ph ph-envelope-simple" style="color:var(--accent-blue);"></i>
-                        <span style="font-weight:500; color:#333;">${mail.address}</span>
-                        <span style="font-size:12px; color:#999; margin-left:8px;">${formatDate(mail.created_at)}</span>
+            : subEmails.map(mail => {
+                const actions = selectable
+                    ? `
+                        <div class="email-actions">
+                            <button class="action-btn" onclick="copyText('${mail.address}')"><i class="ph-bold ph-copy"></i></button>
+                            <button class="action-btn delete" onclick="deleteSubEmail(${user.id}, ${mail.id})"><i class="ph-bold ph-trash"></i></button>
+                        </div>
+                    `
+                    : `
+                        <div class="email-actions disabled">
+                            <i class="ph-bold ph-lock"></i>
+                        </div>
+                    `;
+                return `
+                    <div class="email-item" id="email-item-${mail.id}">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <i class="ph ph-envelope-simple" style="color:var(--accent-blue);"></i>
+                            <span style="font-weight:500; color:#333;">${mail.address}</span>
+                            <span style="font-size:12px; color:#999; margin-left:8px;">${formatDate(mail.created_at)}</span>
+                        </div>
+                        ${actions}
                     </div>
-                    <div class="email-actions">
-                        <button class="action-btn" onclick="copyText('${mail.address}')"><i class="ph-bold ph-copy"></i></button>
-                        <button class="action-btn delete" onclick="deleteSubEmail(${user.id}, ${mail.id})"><i class="ph-bold ph-trash"></i></button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+
+        const checkbox = selectable
+            ? `<div class="custom-checkbox ${isSelected ? 'checked' : ''}" onclick="toggleSelectUser(${user.id})"></div>`
+            : `<div class="custom-checkbox disabled"></div>`;
+
+        const sendSwitch = selectable
+            ? `<div class="ios-switch ${user.can_send ? 'on' : ''}" style="transform:scale(0.8); transform-origin:left;" onclick="event.stopPropagation(); toggleSendPermission(${user.id})">
+                    <div class="ios-switch-thumb"></div>
+               </div>`
+            : `<div class="ios-switch ${user.can_send ? 'on' : ''} disabled" style="transform:scale(0.8); transform-origin:left;">
+                    <div class="ios-switch-thumb"></div>
+               </div>`;
+
+        const statusSelect = `
+            <select class="status-select ${user.status === 'Active' ? 'active' : 'inactive'}" onclick="event.stopPropagation()" onchange="changeUserStatus(${user.id}, this.value)" ${selectable ? '' : 'disabled'}>
+                <option value="Active" ${user.status === 'Active' ? 'selected' : ''}>活跃</option>
+                <option value="Inactive" ${user.status !== 'Active' ? 'selected' : ''}>停用</option>
+            </select>
+        `;
+
+        const actionButtons = selectable
+            ? `
+                <button class="action-btn" title="编辑" onclick="event.stopPropagation(); openEditUser(${user.id})"><i class="ph-bold ph-pencil-simple"></i></button>
+                <button class="action-btn delete" title="删除" onclick="event.stopPropagation(); deleteUser(${user.id})"><i class="ph-bold ph-trash"></i></button>
+              `
+            : `<div class="row-locked"><i class="ph-bold ph-lock"></i><span>只读</span></div>`;
+
+        const assignButton = selectable
+            ? `<button class="btn btn-primary" style="height:28px; font-size:12px;" onclick="openAssignModal(${user.id})"><i class="ph-bold ph-plus"></i> 分配新邮箱</button>`
+            : `<div class="locked-hint">只读</div>`;
 
         return `
             <div class="user-block ${isSelected ? 'selected' : ''}" id="user-block-${user.id}" style="${isSelected ? 'background-color: #F2F8FF;' : ''}">
                 <div class="t-row" onclick="toggleExpand(${user.id}, event)">
                     <div style="display: flex; justify-content: center;" onclick="event.stopPropagation()">
-                        <div class="custom-checkbox ${isSelected ? 'checked' : ''}" onclick="toggleSelectUser(${user.id})"></div>
+                        ${checkbox}
                     </div>
                     <div class="col-avatar"><div class="avatar">${(user.name || user.username || 'U').substring(0, 2).toUpperCase()}</div></div>
                     <div class="col-info">
@@ -634,27 +736,21 @@ function renderUserTable() {
                         <span class="username">@${user.username}</span>
                     </div>
                     <div class="col-meta">
-                        <div class="ios-switch ${user.can_send ? 'on' : ''}" style="transform:scale(0.8); transform-origin:left;" onclick="event.stopPropagation(); toggleSendPermission(${user.id})">
-                            <div class="ios-switch-thumb"></div>
-                        </div>
+                        ${sendSwitch}
                         <span style="font-size:11px; color:#999; margin-left:4px;">${user.can_send ? '允许' : '禁止'}</span>
                     </div>
                     <div class="col-meta">
                         <div class="quota-container">
-                            <div class="quota-text">${used} / ${user.quota || 10} 个</div>
+                            <div class="quota-text">${used} / ${quotaLimit} 个</div>
                             <div class="quota-track"><div class="quota-fill" style="width: ${percentage}%"></div></div>
                         </div>
                     </div>
-                    <div class="col-meta"><span style="background:#F2F2F7; padding:4px 8px; border-radius:6px; font-size:12px; color:#000;">${user.role}</span></div>
+                    <div class="col-meta"><span class="role-badge ${locked ? 'role-super' : ''}">${roleLabel}</span></div>
                     <div class="col-meta">
-                        <select class="status-select ${user.status === 'Active' ? 'active' : 'inactive'}" onclick="event.stopPropagation()" onchange="changeUserStatus(${user.id}, this.value)">
-                            <option value="Active" ${user.status === 'Active' ? 'selected' : ''}>活跃</option>
-                            <option value="Inactive" ${user.status !== 'Active' ? 'selected' : ''}>停用</option>
-                        </select>
+                        ${statusSelect}
                     </div>
                     <div class="col-meta" style="gap:4px;">
-                        <button class="action-btn" title="编辑" onclick="event.stopPropagation(); openEditUser(${user.id})"><i class="ph-bold ph-pencil-simple"></i></button>
-                        <button class="action-btn delete" title="删除" onclick="event.stopPropagation(); deleteUser(${user.id})"><i class="ph-bold ph-trash"></i></button>
+                        ${actionButtons}
                     </div>
                     <div class="col-meta" style="text-align:right;">
                         <i class="ph-bold ph-caret-right chevron"></i>
@@ -664,7 +760,7 @@ function renderUserTable() {
                     <div class="panel-content">
                         <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 13px; font-weight: 600; color: #3C3C4399;">已分配邮箱列表 (${used})</span>
-                            <button class="btn btn-primary" style="height:28px; font-size:12px;" onclick="openAssignModal(${user.id})"><i class="ph-bold ph-plus"></i> 分配新邮箱</button>
+                            ${assignButton}
                         </div>
                         <div id="sub-emails-${user.id}">${subEmailsHTML}</div>
                     </div>
@@ -682,6 +778,9 @@ window.toggleExpand = function(userId, event) {
 
 // 用户选择
 window.toggleSelectUser = function(id) {
+    if (!canManageUsers()) return;
+    const user = users.find(u => u.id === id);
+    if (!user || isLockedUser(user)) return;
     if (selectedUserIds.has(id)) {
         selectedUserIds.delete(id);
     } else {
@@ -691,12 +790,14 @@ window.toggleSelectUser = function(id) {
 };
 
 window.toggleSelectAllUsers = function() {
+    if (!canManageUsers()) return;
     const checkbox = document.getElementById('selectAllUsersCheckbox');
-    if (selectedUserIds.size === users.length) {
+    const selectableUsers = users.filter(u => !isLockedUser(u));
+    if (selectedUserIds.size === selectableUsers.length) {
         selectedUserIds.clear();
         checkbox.classList.remove('checked');
     } else {
-        users.forEach(u => selectedUserIds.add(u.id));
+        selectableUsers.forEach(u => selectedUserIds.add(u.id));
         checkbox.classList.add('checked');
     }
     renderUserTable();
@@ -706,7 +807,7 @@ function updateUserBatchBar() {
     const count = selectedUserIds.size;
     document.getElementById('selectedUsersCount').textContent = count;
     const bar = document.getElementById('userBatchBar');
-    if (count > 0) {
+    if (count > 0 && canManageUsers()) {
         bar.classList.add('show');
     } else {
         bar.classList.remove('show');
@@ -714,6 +815,7 @@ function updateUserBatchBar() {
 }
 
 window.cancelUserSelection = function() {
+    if (!canManageUsers()) return;
     selectedUserIds.clear();
     document.getElementById('selectAllUsersCheckbox').classList.remove('checked');
     renderUserTable();
@@ -723,6 +825,7 @@ window.cancelUserSelection = function() {
 window.toggleSendPermission = async function(userId) {
     const user = users.find(u => u.id === userId);
     if (!user) return;
+    if (!ensureManageAccess(user)) return;
 
     try {
         await userAPI.update(userId, { can_send: !user.can_send });
@@ -735,9 +838,11 @@ window.toggleSendPermission = async function(userId) {
 };
 
 window.changeUserStatus = async function(userId, status) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (!ensureManageAccess(user)) return;
     try {
         await userAPI.update(userId, { status });
-        const user = users.find(u => u.id === userId);
         if (user) user.status = status;
         renderUserTable();
         showToast('状态已更新');
@@ -747,6 +852,9 @@ window.changeUserStatus = async function(userId, status) {
 };
 
 window.deleteUser = function(userId) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (!ensureManageAccess(user)) return;
     openIOSAlert('删除用户', '确定要删除此用户吗？操作无法撤销。', async () => {
         try {
             await userAPI.delete(userId);
@@ -763,6 +871,10 @@ window.deleteUser = function(userId) {
 };
 
 window.batchDeleteUsers = function() {
+    if (!canManageUsers()) {
+        showToast('无权限');
+        return;
+    }
     const count = selectedUserIds.size;
     if (count === 0) return;
 
@@ -784,6 +896,10 @@ window.batchDeleteUsers = function() {
 
 // 用户编辑
 window.openUserModal = function() {
+    if (!canManageUsers()) {
+        showToast('无权限');
+        return;
+    }
     document.getElementById('modalTitle').textContent = '新增用户';
     document.getElementById('editUserId').value = '';
     document.getElementById('inputName').value = '';
@@ -805,6 +921,7 @@ window.openUserModal = function() {
 window.openEditUser = function(userId) {
     const user = users.find(u => u.id === userId);
     if (!user) return;
+    if (!ensureManageAccess(user)) return;
 
     document.getElementById('modalTitle').textContent = '编辑用户';
     document.getElementById('editUserId').value = user.id;
@@ -826,6 +943,10 @@ window.openEditUser = function(userId) {
 };
 
 window.saveUser = async function() {
+    if (!canManageUsers()) {
+        showToast('无权限');
+        return;
+    }
     const id = document.getElementById('editUserId').value;
     const name = document.getElementById('inputName').value.trim();
     const username = document.getElementById('inputLoginUsername').value.trim();
@@ -873,6 +994,9 @@ window.saveUser = async function() {
 
 // 分配邮箱
 window.openAssignModal = function(userId) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (!ensureManageAccess(user)) return;
     document.getElementById('assignUserId').value = userId;
     document.getElementById('assignPrefix').value = '';
 
@@ -883,6 +1007,10 @@ window.openAssignModal = function(userId) {
 };
 
 window.confirmAssignEmail = async function() {
+    if (!canManageUsers()) {
+        showToast('无权限');
+        return;
+    }
     const userId = parseInt(document.getElementById('assignUserId').value);
     const prefix = document.getElementById('assignPrefix').value.trim();
     const domain = document.getElementById('assignDomain').value;
@@ -903,6 +1031,9 @@ window.confirmAssignEmail = async function() {
 };
 
 window.deleteSubEmail = function(userId, mailboxId) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (!ensureManageAccess(user)) return;
     openIOSAlert('删除邮箱', '确定永久删除此邮箱吗？', async () => {
         try {
             await userAPI.removeMailbox(userId, mailboxId);
@@ -966,6 +1097,7 @@ function renderAllMailboxes() {
         const pwdText = isDefaultPwd ? '默认 (同邮箱)' : '已自定义';
         const pwdClass = isDefaultPwd ? '' : 'custom';
         const pwdColor = isDefaultPwd ? 'var(--label-secondary)' : 'var(--accent-blue)';
+        const safeAddress = String(item.address || '').replace(/'/g, "\\'");
 
         return `
             <div class="e-row" id="email-row-${item.id}" style="${isSelected ? 'background: #F2F8FF;' : ''}">
@@ -991,6 +1123,9 @@ function renderAllMailboxes() {
                 </div>
                 <div style="color: #999; font-size: 13px;">${formatDate(item.created_at)}</div>
                 <div class="col-actions">
+                    <button class="icon-btn" title="查看收件箱" onclick="openMailboxViewer('${safeAddress}')">
+                        <i class="ph-bold ph-envelope-open"></i>
+                    </button>
                     <button class="icon-btn" title="复制邮箱" onclick="copyText('${item.address}')">
                         <i class="ph-bold ph-copy"></i>
                     </button>
@@ -1002,6 +1137,152 @@ function renderAllMailboxes() {
         `;
     }).join('');
 }
+
+// ============================================
+// 邮箱收件箱查看器（所有邮箱二级界面）
+// ============================================
+function getViewerEmailById(id) {
+    return (viewerEmails || []).find((item) => String(item.id) == String(id));
+}
+
+function setMailboxViewerLoading() {
+    const list = document.getElementById('mailboxViewerList');
+    if (list) {
+        list.innerHTML = `
+            <div class="inbox-empty">
+                <i class="ph ph-tray"></i>
+                <span>加载中...</span>
+            </div>
+        `;
+    }
+    const countEl = document.getElementById('mailboxViewerCount');
+    if (countEl) {
+        countEl.textContent = '加载中...';
+    }
+}
+
+function renderMailboxViewer(emails) {
+    const list = document.getElementById('mailboxViewerList');
+    if (!list) return;
+
+    viewerEmails = Array.isArray(emails) ? emails : [];
+
+    if (viewerEmails.length === 0) {
+        list.innerHTML = `
+            <div class="inbox-empty">
+                <i class="ph ph-tray"></i>
+                <span>暂无新邮件</span>
+            </div>
+        `;
+    } else {
+        list.innerHTML = viewerEmails.map(email => {
+            const fromRaw = email.from_name || email.from_address || 'U';
+            const subjectRaw = email.subject || '(无主题)';
+            const previewRaw = getEmailPreviewText(email).slice(0, 120);
+            const avatarChar = String(fromRaw || 'U').trim().charAt(0).toUpperCase();
+            return `
+                <div class="mail-item" onclick="openViewerMailDetail(${email.id})">
+                    <div class="mail-avatar">${escapeHtml(avatarChar || 'U')}</div>
+                    <div class="mail-content">
+                        <div class="mail-header">
+                            <span class="mail-from">${escapeHtml(fromRaw)}</span>
+                            <span class="mail-time">${formatTime(email.received_at)}</span>
+                        </div>
+                        <div class="mail-subject">${escapeHtml(subjectRaw)}</div>
+                        <div class="mail-preview">${escapeHtml(previewRaw)}</div>
+                    </div>
+                    <div class="mail-actions">
+                        <button class="action-btn" onclick="copyViewerEmailCode(event, ${email.id})" title="复制验证码">
+                            <i class="ph-bold ph-copy"></i>
+                        </button>
+                        <button class="action-btn delete" onclick="deleteViewerEmailItem(event, ${email.id})" title="删除邮件">
+                            <i class="ph-bold ph-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    const countEl = document.getElementById('mailboxViewerCount');
+    if (countEl) {
+        countEl.textContent = `共 ${viewerEmails.length} 封`;
+    }
+}
+
+async function loadMailboxViewer() {
+    if (!viewerMailbox) return;
+    setMailboxViewerLoading();
+    try {
+        const response = await emailAPI.getEmails(viewerMailbox);
+        const emails = response.emails || [];
+        renderMailboxViewer(emails);
+    } catch (error) {
+        console.error('Failed to load mailbox viewer:', error);
+        const list = document.getElementById('mailboxViewerList');
+        if (list) {
+            list.innerHTML = `
+                <div class="inbox-empty">
+                    <i class="ph ph-warning-circle"></i>
+                    <span>加载失败</span>
+                </div>
+            `;
+        }
+        showToast('加载邮件失败');
+    }
+}
+
+window.openMailboxViewer = async function(address) {
+    viewerMailbox = address;
+    const addressEl = document.getElementById('mailboxViewerAddress');
+    if (addressEl) addressEl.textContent = address || '';
+    openModal('mailboxViewerModal');
+    await loadMailboxViewer();
+};
+
+window.closeMailboxViewer = function() {
+    viewerMailbox = null;
+    viewerEmails = [];
+    closeModal('mailboxViewerModal');
+};
+
+window.openViewerMailDetail = async function(id) {
+    closeMailboxViewer();
+    await openMailDetail(id);
+};
+
+window.refreshMailboxViewer = function() {
+    if (!viewerMailbox) return;
+    loadMailboxViewer();
+};
+
+window.copyViewerEmailCode = function(event, id) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const email = getViewerEmailById(id);
+    const code = getEmailVerificationCode(email);
+    if (!code) {
+        showToast('无法复制');
+        return;
+    }
+    copyText(code);
+};
+
+window.deleteViewerEmailItem = async function(event, id) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    try {
+        await emailAPI.delete(id);
+        showToast('已删除');
+        await loadMailboxViewer();
+    } catch (error) {
+        showToast(error.message || '删除失败');
+    }
+};
 
 // 邮箱选择
 window.toggleSelectEmail = function(id) {

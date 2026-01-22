@@ -462,16 +462,13 @@ input[type=range]::-webkit-slider-thumb {
 
 /* --- 邮件列表项 --- */
 .mail-item {
-    padding: 14px 16px; border-bottom: 1px solid var(--ios-separator-light);
+    padding: 16px 18px; border-bottom: 1px solid var(--ios-separator-light);
     cursor: pointer; transition: background 0.2s;
     display: flex; align-items: center; gap: 12px;
-    min-height: 84px;
+    min-height: 88px; height: 88px;
 }
-.mail-item:hover { background: #F9F9F9; }
+.mail-item:hover { background: #F7F7FA; }
 .mail-item:last-child { border-bottom: none; }
-@media (hover: none) {
-    .mail-actions { opacity: 1; pointer-events: auto; }
-}
 
 .mail-avatar {
     width: 40px; height: 40px; border-radius: 50%; background: var(--accent-blue);
@@ -486,13 +483,25 @@ input[type=range]::-webkit-slider-thumb {
 .mail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .mail-from { font-size: 15px; font-weight: 600; color: var(--label-primary); }
 .mail-time { font-size: 12px; color: var(--label-secondary); }
-.mail-subject { font-size: 14px; color: var(--label-primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mail-preview { font-size: 13px; color: var(--label-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail-subject { font-size: 14px; color: var(--label-primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; min-height: 1.2em; }
+.mail-preview { font-size: 13px; color: var(--label-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; min-height: 1.2em; }
 .mail-actions {
-    display: flex; gap: 8px; opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
-    margin-left: auto;
+    display: flex; gap: 6px; opacity: 1; pointer-events: auto;
+    margin-left: auto; padding: 6px; border-radius: 999px;
+    background: rgba(118,118,128,0.12); border: 1px solid rgba(0,0,0,0.04);
+    flex-shrink: 0;
 }
-.mail-item:hover .mail-actions { opacity: 1; pointer-events: auto; }
+.mail-actions .action-btn {
+    width: 30px; height: 30px; border-radius: 999px;
+    background: #fff; border: 1px solid rgba(0,0,0,0.06);
+    color: var(--label-secondary);
+}
+.mail-actions .action-btn:hover {
+    background: #fff; color: var(--label-primary);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.mail-actions .action-btn.delete { color: var(--system-red); }
+.mail-actions .action-btn.delete:hover { background: rgba(255, 59, 48, 0.12); color: var(--system-red); }
 
 /* --- 验证码提取框 --- */
 .code-box {
@@ -584,6 +593,13 @@ input[type=range]::-webkit-slider-thumb {
 .quota-track { width: 100%; height: 6px; background: #E5E5EA; border-radius: 3px; overflow: hidden; margin-top: 6px; }
 .quota-fill { height: 100%; background: var(--accent-blue); border-radius: 3px; transition: width 0.3s; }
 .quota-text { font-size: 12px; color: #3C3C4399; margin-top: 2px; display: block; }
+.custom-checkbox.disabled { opacity: 0.35; pointer-events: none; background: #E5E5EA; cursor: not-allowed; }
+.ios-switch.disabled { opacity: 0.5; pointer-events: none; }
+.email-actions.disabled { opacity: 0.45; pointer-events: none; display: flex; align-items: center; gap: 6px; }
+.row-locked { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--label-secondary); }
+.locked-hint { font-size: 12px; color: var(--label-secondary); padding: 4px 10px; border-radius: 999px; background: #F2F2F7; }
+.role-badge { background:#F2F2F7; padding:4px 8px; border-radius:6px; font-size:12px; color:#000; display:inline-flex; align-items:center; gap:4px; }
+.role-badge.role-super { background: rgba(0,122,255,0.12); color: var(--accent-blue); font-weight: 600; }
 
 .chevron { transition: transform 0.3s; color: #3C3C4399; }
 .user-block.expanded .chevron { transform: rotate(90deg); color: #000; }
@@ -739,6 +755,15 @@ input[type=range]::-webkit-slider-thumb {
 .mail-detail-time { font-size: 12px; color: var(--label-secondary); }
 .mail-detail-body { padding: 24px; font-size: 15px; line-height: 1.6; color: var(--label-primary); }
 .mail-detail-body pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+
+/* --- 邮箱收件箱查看器 --- */
+.mailbox-viewer-modal { width: 780px; max-height: 85vh; }
+.mailbox-viewer-header { align-items: center; }
+.viewer-title { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.viewer-address { font-size: 12px; color: var(--label-secondary); }
+.mailbox-viewer-body { padding: 16px 20px 20px; overflow-y: auto; }
+.viewer-meta { font-size: 12px; color: var(--label-secondary); margin-bottom: 10px; }
+.mailbox-viewer-list { display: flex; flex-direction: column; }
 
 /* --- 普通模态框 --- */
 .modal-card {

@@ -221,8 +221,14 @@ export const domainAPI = {
 // ============================================
 export const mailboxAPI = {
     // 获取历史邮箱列表
-    async getMailboxes() {
-        const response = await request('/api/mailboxes');
+    async getMailboxes(params = {}) {
+        const queryParams = new URLSearchParams();
+        if (params.limit) queryParams.set('limit', String(params.limit));
+        if (params.offset) queryParams.set('offset', String(params.offset));
+        if (params.scope) queryParams.set('scope', String(params.scope));
+
+        const queryString = queryParams.toString();
+        const response = await request(`/api/mailboxes${queryString ? '?' + queryString : ''}`);
         return normalizeMailboxResponse(response);
     },
 
@@ -248,14 +254,18 @@ export const mailboxAPI = {
     },
 
     // 清空所有历史邮箱
-    async clearAll() {
+    async clearAll(params = {}) {
         const limit = 50;
         let offset = 0;
         let allMailboxes = [];
 
         while (true) {
-            const response = await request(`/api/mailboxes?limit=${limit}&offset=${offset}`);
-            const batch = normalizeMailboxResponse(response).mailboxes || [];
+            const response = await mailboxAPI.getMailboxes({
+                limit,
+                offset,
+                scope: params.scope,
+            });
+            const batch = (response.mailboxes || []);
             if (batch.length === 0) break;
             allMailboxes = allMailboxes.concat(batch);
             if (batch.length < limit) break;
@@ -269,6 +279,15 @@ export const mailboxAPI = {
         );
         const deleted = results.filter((r) => r.status === 'fulfilled').length;
         return { success: true, deleted };
+    },
+};
+
+// ============================================
+// 配额相关 API
+// ============================================
+export const quotaAPI = {
+    async get() {
+        return request('/api/user/quota');
     },
 };
 
@@ -580,12 +599,3 @@ export const mailboxUserAPI = {
 // ============================================
 // 导出所有 API
 // ============================================
-export default {
-    auth: authAPI,
-    domain: domainAPI,
-    mailbox: mailboxAPI,
-    email: emailAPI,
-    user: userAPI,
-    adminMailbox: adminMailboxAPI,
-    mailboxUser: mailboxUserAPI,
-};

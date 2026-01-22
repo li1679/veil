@@ -33,14 +33,6 @@ export function closeModal(modalId) {
     if (modal) modal.classList.remove('active');
 }
 
-export function toggleModal(modalId, show) {
-    if (show) {
-        openModal(modalId);
-    } else {
-        closeModal(modalId);
-    }
-}
-
 // ============================================
 // iOS 风格确认框
 // ============================================
@@ -57,12 +49,12 @@ export function openIOSAlert(title, desc, confirmCallback) {
     openModal('iosAlertModal');
 }
 
-export function closeIOSAlert() {
+function closeIOSAlert() {
     closeModal('iosAlertModal');
     pendingAlertAction = null;
 }
 
-export function confirmIOSAlert() {
+function confirmIOSAlert() {
     if (pendingAlertAction) {
         pendingAlertAction();
     }
@@ -70,7 +62,7 @@ export function confirmIOSAlert() {
 }
 
 // 初始化 iOS Alert 确认按钮
-export function initIOSAlert() {
+function initIOSAlert() {
     const confirmBtn = document.getElementById('iosAlertConfirmBtn');
     if (confirmBtn) {
         confirmBtn.onclick = confirmIOSAlert;
@@ -134,13 +126,13 @@ export function toggleUserMenu() {
     if (menu) menu.classList.toggle('show');
 }
 
-export function closeUserMenu() {
+function closeUserMenu() {
     const menu = document.getElementById('userMenu');
     if (menu) menu.classList.remove('show');
 }
 
 // 点击外部关闭菜单
-export function initUserMenuClose() {
+function initUserMenuClose() {
     document.addEventListener('click', (e) => {
         const container = document.querySelector('.user-profile-container');
         if (container && !container.contains(e.target)) {
@@ -152,26 +144,6 @@ export function initUserMenuClose() {
 // ============================================
 // 下拉框
 // ============================================
-export function toggleDropdown(id) {
-    const dropdown = document.getElementById(id);
-    if (dropdown) dropdown.classList.toggle('show');
-}
-
-export function closeDropdown(id) {
-    const dropdown = document.getElementById(id);
-    if (dropdown) dropdown.classList.remove('show');
-}
-
-// 点击外部关闭下拉框
-export function initDropdownClose(wrapperId, dropdownId) {
-    document.addEventListener('click', (e) => {
-        const wrapper = document.querySelector(`.${wrapperId}`);
-        if (wrapper && !e.target.closest(`.${wrapperId}`)) {
-            closeDropdown(dropdownId);
-        }
-    });
-}
-
 // ============================================
 // 验证码提取
 // ============================================
@@ -256,18 +228,6 @@ export function formatDate(dateString) {
 }
 
 // ============================================
-// 表单验证
-// ============================================
-export function validateEmail(email) {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-}
-
-export function validateRequired(value) {
-    return value && value.trim().length > 0;
-}
-
-// ============================================
 // 本地存储
 // ============================================
 export function getStorage(key, defaultValue = null) {
@@ -298,21 +258,14 @@ export function removeStorage(key) {
 // ============================================
 // 移动端侧边栏
 // ============================================
-export function openSidebar() {
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.querySelector('.sidebar-overlay');
-    if (sidebar) sidebar.classList.add('open');
-    if (overlay) overlay.classList.add('show');
-}
-
-export function closeSidebar() {
+function closeSidebar() {
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.querySelector('.sidebar-overlay');
     if (sidebar) sidebar.classList.remove('open');
     if (overlay) overlay.classList.remove('show');
 }
 
-export function initMobileSidebar() {
+function initMobileSidebar() {
     const overlay = document.querySelector('.sidebar-overlay');
     if (overlay) {
         overlay.addEventListener('click', closeSidebar);

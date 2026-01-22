@@ -13,6 +13,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
   const isMailboxOnly = !!options.mailboxOnly;
   const MOCK_DOMAINS = ['exa.cc', 'exr.yp', 'duio.ty'];
   const RESEND_API_KEY = options.resendApiKey || '';
+  const ADMIN_NAME = String(options.adminName || '').trim().toLowerCase();
 
   // 邮箱用户只能访问特定的API端点和自己的数据
   if (isMailboxOnly) {
@@ -78,9 +79,20 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     if (!p) return false;
     if (p.role !== 'admin') return false;
     // __root__（根管理员）视为严格管理员
-    if (String(p.username || '') === '__root__') return true;
-    if (options?.adminName){ return String(p.username || '').toLowerCase() === String(options.adminName || '').toLowerCase(); }
+    const uname = String(p.username || '').trim().toLowerCase();
+    if (uname === '__root__') return true;
+    if (ADMIN_NAME){ return uname === ADMIN_NAME; }
     return true;
+  }
+  function isAdminRole(){
+    const p = getJwtPayload();
+    return !!p && p.role === 'admin';
+  }
+  function isSuperAdminName(username){
+    const uname = String(username || '').trim().toLowerCase();
+    if (!uname) return false;
+    if (uname === '__root__') return true;
+    return ADMIN_NAME ? uname === ADMIN_NAME : false;
   }
   
   async function sha256Hex(text){
@@ -268,12 +280,16 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
 
   // ================= 用户管理接口（仅非演示模式） =================
   if (!isMock && path === '/api/users' && request.method === 'GET'){
-    if (!isStrictAdmin()) return new Response('Forbidden', { status: 403 });
+    if (!isStrictAdmin() && !isAdminRole()) return new Response('Forbidden', { status: 403 });
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 100);
     const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10), 0);
     const sort = url.searchParams.get('sort') || 'desc';
     try{
-      const users = await listUsersWithCounts(db, { limit, offset, sort });
+      const list = await listUsersWithCounts(db, { limit, offset, sort });
+      const users = (list || []).map((user) => ({
+        ...user,
+        is_super_admin: isSuperAdminName(user?.username)
+      }));
       return Response.json(users);
     }catch(e){ return new Response('查询失败', { status: 500 }); }
   }
@@ -284,6 +300,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       const body = await request.json();
       const username = String(body.username || '').trim().toLowerCase();
       if (!username) return new Response('用户名不能为空', { status: 400 });
+      if (isSuperAdminName(username)) return new Response('该用户名为超级管理员保留', { status: 400 });
       const role = (body.role || 'user') === 'admin' ? 'admin' : 'user';
       const mailboxLimit = Number(body.mailboxLimit || 10);
       const password = String(body.password || '').trim();
@@ -306,6 +323,9 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     const id = Number(path.split('/')[3]);
     if (!id) return new Response('无效ID', { status: 400 });
     try{
+      const target = await db.prepare('SELECT username FROM users WHERE id = ? LIMIT 1').bind(id).all();
+      if (!target?.results?.length) return new Response('用户不存在', { status: 404 });
+      if (isSuperAdminName(target.results[0].username)) return new Response('Forbidden', { status: 403 });
       const body = await request.json();
       const fields = {};
       if (typeof body.mailboxLimit !== 'undefined') fields.mailbox_limit = Math.max(0, Number(body.mailboxLimit));
@@ -321,7 +341,13 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     if (!isStrictAdmin()) return new Response('Forbidden', { status: 403 });
     const id = Number(path.split('/')[3]);
     if (!id) return new Response('无效ID', { status: 400 });
-    try{ await deleteUser(db, id); return Response.json({ success: true }); }
+    try{
+      const target = await db.prepare('SELECT username FROM users WHERE id = ? LIMIT 1').bind(id).all();
+      if (!target?.results?.length) return new Response('用户不存在', { status: 404 });
+      if (isSuperAdminName(target.results[0].username)) return new Response('Forbidden', { status: 403 });
+      await deleteUser(db, id);
+      return Response.json({ success: true });
+    }
     catch(e){ return new Response('删除失败: ' + (e?.message || e), { status: 500 }); }
   }
 
@@ -332,6 +358,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       const username = String(body.username || '').trim();
       const address = String(body.address || '').trim().toLowerCase();
       if (!username || !address) return new Response('参数不完整', { status: 400 });
+      if (isSuperAdminName(username)) return new Response('Forbidden', { status: 403 });
       const result = await assignMailboxToUser(db, { username, address });
       return Response.json(result);
     }catch(e){ return new Response('分配失败: ' + (e?.message || e), { status: 500 }); }
@@ -344,6 +371,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       const username = String(body.username || '').trim();
       const address = String(body.address || '').trim().toLowerCase();
       if (!username || !address) return new Response('参数不完整', { status: 400 });
+      if (isSuperAdminName(username)) return new Response('Forbidden', { status: 403 });
       const result = await unassignMailboxFromUser(db, { username, address });
       return Response.json(result);
     }catch(e){ return new Response('取消分配失败: ' + (e?.message || e), { status: 500 }); }
@@ -774,12 +802,14 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
     const domain = String(url.searchParams.get('domain') || '').trim().toLowerCase();
     const canLoginParam = String(url.searchParams.get('can_login') || '').trim();
+    const scope = String(url.searchParams.get('scope') || '').trim().toLowerCase();
+    const ownOnly = scope === 'own' || scope === 'mine' || scope === 'self';
     if (isMock) {
       return Response.json(buildMockMailboxes(limit, offset, mailDomains));
     }
     // 超级管理员（严格管理员）可查看全部；其他仅查看自身绑定
     try{
-      if (isStrictAdmin()){
+      if (isStrictAdmin() && !ownOnly){
         // 严格管理员：查看所有邮箱，并用自己在 user_mailboxes 中的置顶状态覆盖；未置顶则为 0
         const payload = getJwtPayload();
         const adminUid = Number(payload?.userId || 0);
@@ -834,7 +864,17 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
         return Response.json({ mailboxes });
       }
       const payload = getJwtPayload();
-      const uid = Number(payload?.userId || 0);
+      let uid = Number(payload?.userId || 0);
+      if (!uid && isStrictAdmin()) {
+        const adminName = String(options?.adminName || payload?.username || '').trim().toLowerCase();
+        if (adminName) {
+          const { results } = await db.prepare('SELECT id FROM users WHERE username = ? LIMIT 1')
+            .bind(adminName).all();
+          if (results && results.length) {
+            uid = Number(results[0].id);
+          }
+        }
+      }
       if (!uid) return Response.json([]);
       const like = `%${q.replace(/%/g,'').replace(/_/g,'')}%`;
       
@@ -1108,37 +1148,66 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     if (!raw) return new Response('缺少 address 参数', { status: 400 });
     const normalized = String(raw || '').trim().toLowerCase();
     try {
-      const { invalidateMailboxCache } = await import('./cacheHelper.js');
+      const { invalidateMailboxCache, invalidateUserQuotaCache, invalidateSystemStatCache } = await import('./cacheHelper.js');
       
       const mailboxId = await getMailboxIdByAddress(db, normalized);
       // 未找到则明确返回 404，避免前端误判为成功
       if (!mailboxId) return new Response(JSON.stringify({ success: false, message: '邮箱不存在' }), { status: 404 });
-      if (!isStrictAdmin()){
-        // 二级管理员（数据库中的 admin 角色）仅能删除自己绑定的邮箱
-        const payload = getJwtPayload();
-        if (!payload || payload.role !== 'admin' || !payload.userId) return new Response('Forbidden', { status: 403 });
+
+      const payload = getJwtPayload();
+      const role = String(payload?.role || '');
+      const uid = Number(payload?.userId || 0);
+      const strict = isStrictAdmin();
+
+      if (!strict) {
+        if (!uid || (role !== 'admin' && role !== 'user')) return new Response('Forbidden', { status: 403 });
         const own = await db.prepare('SELECT 1 FROM user_mailboxes WHERE user_id = ? AND mailbox_id = ? LIMIT 1')
-          .bind(Number(payload.userId), mailboxId).all();
+          .bind(uid, mailboxId).all();
         if (!own?.results?.length) return new Response('Forbidden', { status: 403 });
       }
+
+      const { results: owners } = await db.prepare('SELECT user_id FROM user_mailboxes WHERE mailbox_id = ?')
+        .bind(mailboxId).all();
+      const ownerIds = (owners || []).map((row) => row.user_id).filter(Boolean);
+
+      let deleted = false;
+      let unassigned = false;
+
       // 简易事务，降低并发插入导致的外键失败概率
       try { await db.exec('BEGIN'); } catch(_) {}
-      await db.prepare('DELETE FROM messages WHERE mailbox_id = ?').bind(mailboxId).run();
-      const deleteResult = await db.prepare('DELETE FROM mailboxes WHERE id = ?').bind(mailboxId).run();
+
+      if (strict) {
+        await db.prepare('DELETE FROM user_mailboxes WHERE mailbox_id = ?').bind(mailboxId).run();
+        await db.prepare('DELETE FROM messages WHERE mailbox_id = ?').bind(mailboxId).run();
+        const deleteResult = await db.prepare('DELETE FROM mailboxes WHERE id = ?').bind(mailboxId).run();
+        deleted = (deleteResult?.meta?.changes || 0) > 0;
+      } else {
+        await db.prepare('DELETE FROM user_mailboxes WHERE user_id = ? AND mailbox_id = ?')
+          .bind(uid, mailboxId).run();
+        unassigned = true;
+        const remain = await db.prepare('SELECT 1 FROM user_mailboxes WHERE mailbox_id = ? LIMIT 1')
+          .bind(mailboxId).all();
+        if (!remain?.results?.length) {
+          await db.prepare('DELETE FROM messages WHERE mailbox_id = ?').bind(mailboxId).run();
+          const deleteResult = await db.prepare('DELETE FROM mailboxes WHERE id = ?').bind(mailboxId).run();
+          deleted = (deleteResult?.meta?.changes || 0) > 0;
+        }
+      }
+
       try { await db.exec('COMMIT'); } catch(_) {}
 
-      // 优化：通过 meta.changes 判断删除是否成功，减少 COUNT 查询
-      const deleted = (deleteResult?.meta?.changes || 0) > 0;
-      
-      // 删除成功后使缓存失效
       if (deleted) {
         invalidateMailboxCache(normalized);
-        // 使系统统计缓存失效
-        const { invalidateSystemStatCache } = await import('./cacheHelper.js');
         invalidateSystemStatCache('total_mailboxes');
       }
-      
-      return Response.json({ success: deleted, deleted });
+
+      if (strict) {
+        ownerIds.forEach((id) => invalidateUserQuotaCache(id));
+      } else if (uid) {
+        invalidateUserQuotaCache(uid);
+      }
+
+      return Response.json({ success: true, deleted, unassigned });
     } catch (e) {
       try { await db.exec('ROLLBACK'); } catch(_) {}
       return new Response('删除失败', { status: 500 });

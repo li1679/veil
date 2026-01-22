@@ -8,47 +8,23 @@ export class AssetManager {
   constructor() {
     // 定义允许访问的静态资源路径
     this.allowedPaths = new Set([
-      '/', 
-      '/index.html', 
-      '/login', 
-      '/login.html', 
+      '/',
+      '/index.html',
+      '/login',
+      '/login.html',
+      '/admin',
       '/admin.html',
-      '/html/mailboxes.html',
-      '/mailboxes.html',
+      '/user',
+      '/user.html',
+      '/mailbox',
       '/mailbox.html',
-       '/html/mailbox.html',
-      '/templates/app.html', 
-      '/templates/footer.html', 
-      '/templates/loading.html',
-      '/templates/loading-inline.html',
-      '/templates/toast.html',
-      '/app.js', 
-      '/app.css', 
-      '/admin.js', 
-      '/admin.css', 
-      '/login.js',
-      '/login.css',
-      '/mailbox.js',
-      '/mock.js', 
-      '/favicon.svg', 
-      '/route-guard.js',
-      '/app-router.js',
-      '/app-mobile.js',
-      '/app-mobile.css',
-      '/mailbox.css',
-      '/auth-guard.js',
-      '/storage.js'
+      '/favicon.svg'
     ]);
 
     // 定义允许的路径前缀
     this.allowedPrefixes = [
-      '/assets/',
-      '/pic/',
-      '/templates/',
-      '/public/',
       '/js/',
-      '/css/',
-      '/html/'
+      '/css/'
     ];
 
     // 需要权限验证的路径
@@ -56,8 +32,6 @@ export class AssetManager {
       '/admin.html',
       '/admin',
       '/admin/',
-      '/mailboxes.html',
-      '/html/mailboxes.html',
       '/mailbox.html',
       '/mailbox',
       '/mailbox/'
@@ -149,11 +123,8 @@ export class AssetManager {
       return await this.handleAdminPage(mappedRequest, env, JWT_TOKEN);
     }
 
-    if (pathname === '/mailbox.html' || pathname === '/html/mailbox.html') {
+    if (pathname === '/mailbox.html') {
       return await this.handleMailboxPage(mappedRequest, env, JWT_TOKEN);
-    }
-    if (pathname === '/mailboxes.html' || pathname === '/html/mailboxes.html') {
-      return await this.handleAllMailboxesPage(mappedRequest, env, JWT_TOKEN);
     }
 
     // 其他静态资源直接返回
@@ -176,14 +147,14 @@ export class AssetManager {
     if (payload !== false) {
       // 已登录用户：根据角色重定向到合适的页面
       if (payload.role === 'mailbox') {
-        return Response.redirect(new URL('/html/mailbox.html', url).toString(), 302);
+        return Response.redirect(new URL('/mailbox.html', url).toString(), 302);
       } else {
         return Response.redirect(new URL('/', url).toString(), 302);
       }
     }
     
     // 未登录：进入loading页面进行认证检查
-    return Response.redirect(new URL('/templates/loading.html', url).toString(), 302);
+    return Response.redirect(new URL('/index.html', url).toString(), 302);
   }
 
   /**
@@ -197,10 +168,10 @@ export class AssetManager {
     const payload = await resolveAuthPayload(request, JWT_TOKEN);
     
     if (!payload) {
-      const loading = new URL('/templates/loading.html', url);
+      const loading = new URL('/index.html', url);
       // 根据访问的路径设置重定向目标
       if (url.pathname.includes('mailbox')) {
-        loading.searchParams.set('redirect', '/html/mailbox.html');
+        loading.searchParams.set('redirect', '/mailbox.html');
       } else {
         loading.searchParams.set('redirect', '/admin.html');
       }
@@ -215,7 +186,7 @@ export class AssetManager {
       }
       // 限制邮箱用户访问首页：如果访问 '/' 或 '/index.html'，重定向到邮箱页
       if (url.pathname === '/' || url.pathname === '/index.html') {
-        return Response.redirect(new URL('/html/mailbox.html', url).toString(), 302);
+        return Response.redirect(new URL('/mailbox.html', url).toString(), 302);
       }
     } else {
       // 其他受保护页面
@@ -256,27 +227,24 @@ export class AssetManager {
   handlePathMapping(request, url) {
     let targetUrl = url.toString();
 
-    // 兼容 /login 路由 → /login.html
+    // Map /login -> /login.html
     if (url.pathname === '/login') {
       targetUrl = new URL('/login.html', url).toString();
     }
     
-    // 兼容 /admin 路由 → /admin.html
+    // Map /admin -> /admin.html
     if (url.pathname === '/admin') {
       targetUrl = new URL('/admin.html', url).toString();
     }
     
-    // 兼容 /mailbox 路由 → /html/mailbox.html
+    // Map /user -> /user.html
+    if (url.pathname === '/user') {
+      targetUrl = new URL('/user.html', url).toString();
+    }
+    
+    // Map /mailbox -> /mailbox.html
     if (url.pathname === '/mailbox') {
-      targetUrl = new URL('/html/mailbox.html', url).toString();
-    }
-    // 将 /mailbox.html 统一映射到 /html/mailbox.html（真实文件路径）
-    if (url.pathname === '/mailbox.html') {
-      targetUrl = new URL('/html/mailbox.html', url).toString();
-    }
-    // 将 /mailboxes.html 统一映射到 /html/mailboxes.html
-    if (url.pathname === '/mailboxes.html') {
-      targetUrl = new URL('/html/mailboxes.html', url).toString();
+      targetUrl = new URL('/mailbox.html', url).toString();
     }
 
     return new Request(targetUrl, request);
@@ -296,7 +264,7 @@ export class AssetManager {
     
     // 检查用户角色，邮箱用户重定向到专用页面
     if (payload && payload.role === 'mailbox') {
-      return Response.redirect(new URL('/html/mailbox.html', url).toString(), 302);
+      return Response.redirect(new URL('/mailbox.html', url).toString(), 302);
     }
     
     const resp = await env.ASSETS.fetch(request);
@@ -334,7 +302,7 @@ export class AssetManager {
     
     if (!payload) {
       const loadingReq = new Request(
-        new URL('/templates/loading.html?redirect=%2Fadmin.html', url).toString(),
+        new URL('/index.html?redirect=%2Fadmin.html', url).toString(),
         request
       );
       return env.ASSETS.fetch(loadingReq);
@@ -362,7 +330,7 @@ export class AssetManager {
     
     if (!payload) {
       const loadingReq = new Request(
-        new URL('/templates/loading.html?redirect=%2Fhtml%2Fmailbox.html', url).toString(),
+        new URL('/index.html?redirect=%2Fmailbox.html', url).toString(),
         request
       );
       return env.ASSETS.fetch(loadingReq);
@@ -389,7 +357,7 @@ export class AssetManager {
     const payload = await resolveAuthPayload(request, JWT_TOKEN);
     if (!payload) {
       const loadingReq = new Request(
-        new URL('/templates/loading.html?redirect=%2Fhtml%2Fmailboxes.html', url).toString(),
+        new URL('/index.html?redirect=%2Fmailboxes.html', url).toString(),
         request
       );
       return env.ASSETS.fetch(loadingReq);

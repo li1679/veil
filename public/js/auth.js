@@ -4,10 +4,10 @@
  */
 
 import { authAPI } from './api.js';
-import { showToast, setStorage, getStorage, removeStorage } from './common.js';
+import { setStorage, getStorage, removeStorage } from './common.js';
 
 // 用户角色常量
-export const ROLES = {
+const ROLES = {
     STRICT_ADMIN: 'StrictAdmin',
     ADMIN: 'Admin',
     USER: 'User',
@@ -16,22 +16,6 @@ export const ROLES = {
 
 // 当前用户状态
 let currentUser = null;
-
-// ============================================
-// 获取当前用户
-// ============================================
-export function getCurrentUser() {
-    return currentUser;
-}
-
-export function setCurrentUser(user) {
-    currentUser = user;
-    if (user) {
-        setStorage('veil_user', user);
-    } else {
-        removeStorage('veil_user');
-    }
-}
 
 // ============================================
 // 角色映射：后端小写 -> 前端常量
@@ -122,29 +106,6 @@ export async function logout() {
     }
 }
 
-// ============================================
-// 权限判断
-// ============================================
-export function isAdmin(user = currentUser) {
-    if (!user) return false;
-    return user.role === ROLES.STRICT_ADMIN || user.role === ROLES.ADMIN;
-}
-
-export function isStrictAdmin(user = currentUser) {
-    if (!user) return false;
-    return user.role === ROLES.STRICT_ADMIN;
-}
-
-export function isUser(user = currentUser) {
-    if (!user) return false;
-    return user.role === ROLES.USER;
-}
-
-export function isMailboxUser(user = currentUser) {
-    if (!user) return false;
-    return user.role === ROLES.MAILBOX_USER;
-}
-
 export function canSend(user = currentUser) {
     if (!user) return false;
     return user.canSend === true;
@@ -172,7 +133,7 @@ export function getRedirectUrl(user = currentUser) {
 // ============================================
 // 页面权限守卫
 // ============================================
-export async function requireAuth(allowedRoles = []) {
+async function requireAuth(allowedRoles = []) {
     const user = await checkSession();
 
     if (!user) {
@@ -208,7 +169,7 @@ export async function requireMailboxUser() {
 // ============================================
 // 初始化：尝试从本地存储恢复用户
 // ============================================
-export function initAuth() {
+function initAuth() {
     const storedUser = getStorage('veil_user');
     if (storedUser) {
         currentUser = storedUser;
