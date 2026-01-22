@@ -492,7 +492,8 @@ input[type=range]::-webkit-slider-thumb {
     min-width: 120px; flex-shrink: 0;
 }
 .mail-actions {
-    display: flex; gap: 6px; opacity: 0; pointer-events: none;
+    display: flex; gap: 6px; min-height: 32px;
+    opacity: 0; pointer-events: none;
     transform: translateY(2px);
     transition: opacity 0.16s ease, transform 0.16s ease;
 }
@@ -502,11 +503,18 @@ input[type=range]::-webkit-slider-thumb {
 }
 .mail-actions .action-btn {
     width: 32px; height: 32px; border-radius: 10px;
-    background: transparent; border: none; color: var(--label-secondary);
+    border: 1px solid rgba(0,0,0,0.06);
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(8px);
+    color: var(--label-secondary);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
-.mail-actions .action-btn:hover { background: var(--overlay-light); color: var(--label-primary); }
+.mail-actions .action-btn i { font-size: 16px; line-height: 1; }
+.mail-actions .action-btn:hover { background: var(--overlay-light); color: var(--label-primary); box-shadow: 0 3px 8px rgba(0,0,0,0.08); }
 .mail-actions .action-btn.delete { color: var(--system-red); }
-.mail-actions .action-btn.delete:hover { background: rgba(255, 59, 48, 0.12); color: var(--system-red); }
+.mail-actions .action-btn.delete:hover { background: rgba(255, 59, 48, 0.12); color: var(--system-red); box-shadow: 0 3px 8px rgba(0,0,0,0.08); }
 
 /* --- 验证码提取框 --- */
 .code-box {
@@ -959,11 +967,7 @@ input[type=range]::-webkit-slider-thumb {
         justify-content: space-between;
         width: 100%;
     }
-    .mail-actions {
-        opacity: 1;
-        pointer-events: auto;
-        transform: none;
-    }
+
 
     .content-scroll { padding: 20px; }
     .t-header { display: none; }
@@ -985,4 +989,12 @@ input[type=range]::-webkit-slider-thumb {
     .current-email { font-size: 22px; }
     .actions-row .btn span { display: none; }
     .ios-card { padding: 16px; }
+}
+
+@media (hover: none), (pointer: coarse) {
+    .mail-actions {
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+    }
 }
