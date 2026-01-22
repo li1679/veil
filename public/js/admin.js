@@ -8,7 +8,7 @@ import { requireAdmin, logout, getCurrentUser, canSend } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, openIOSAlert,
     animateDelete, animateBatchDelete, toggleUserMenu, initCommon,
-    formatTime, formatDate, extractCode, getStorage, setStorage
+    formatTime, formatDate, extractCode, getStorage, setStorage, escapeHtml
 } from './common.js';
 
 // ============================================
@@ -18,6 +18,7 @@ let currentUser = null;
 let domains = [];
 let currentEmail = null;
 let emailHistory = [];
+let currentInboxEmails = [];
 let users = [];
 let allMailboxes = [];
 let selectedUserIds = new Set();
@@ -30,7 +31,7 @@ let prefixLength = 12;
 
 // 轮询
 let inboxPollInterval = null;
-const POLL_INTERVAL = 10000; // 10秒
+const POLL_INTERVAL = 5000; // 5秒
 
 // ============================================
 // 初始化
@@ -401,45 +402,91 @@ async function loadInbox() {
     }
 }
 
+function getInboxEmailById(id) {
+    return (currentInboxEmails || []).find((item) => String(item.id) == String(id));
+}
+
+function getEmailPreviewText(email) {
+    return String(email?.text || email?.preview || '').trim();
+}
+
+function getEmailVerificationCode(email) {
+    return email?.verification_code || extractCode(`${email?.subject || ''} ${getEmailPreviewText(email)}`);
+}
+
 function renderInbox(emails) {
     const container = document.getElementById('inboxContainer');
     if (!container) return;
 
-    if (emails.length === 0) {
+    currentInboxEmails = Array.isArray(emails) ? emails : [];
+
+    if (currentInboxEmails.length === 0) {
         container.innerHTML = `
             <div class="inbox-empty">
                 <i class="ph ph-tray"></i>
-                <span>暂无新邮件</span>
+                <span>?????</span>
             </div>
         `;
         return;
     }
 
-    container.innerHTML = emails.map(email => {
-        const code = extractCode(email.subject + ' ' + (email.text || ''));
+    container.innerHTML = currentInboxEmails.map(email => {
+        const fromRaw = email.from_name || email.from_address || 'U';
+        const subjectRaw = email.subject || '(???)';
+        const previewRaw = getEmailPreviewText(email).slice(0, 120);
+        const avatarChar = String(fromRaw || 'U').trim().charAt(0).toUpperCase();
         return `
             <div class="mail-item" onclick="openMailDetail(${email.id})">
-                <div class="mail-avatar">${(email.from_name || email.from_address || 'U')[0].toUpperCase()}</div>
+                <div class="mail-avatar">${escapeHtml(avatarChar || 'U')}</div>
                 <div class="mail-content">
                     <div class="mail-header">
-                        <span class="mail-from">${email.from_name || email.from_address}</span>
+                        <span class="mail-from">${escapeHtml(fromRaw)}</span>
                         <span class="mail-time">${formatTime(email.received_at)}</span>
                     </div>
-                    <div class="mail-subject">${email.subject || '(无主题)'}</div>
-                    <div class="mail-preview">${email.text ? email.text.substring(0, 100) : ''}</div>
-                    ${code ? `
-                        <div class="code-box" onclick="event.stopPropagation(); copyText('${code}')">
-                            <i class="ph-bold ph-copy"></i>
-                            <span>${code}</span>
-                        </div>
-                    ` : ''}
+                    <div class="mail-subject">${escapeHtml(subjectRaw)}</div>
+                    <div class="mail-preview">${escapeHtml(previewRaw)}</div>
+                </div>
+                <div class="mail-actions">
+                    <button class="action-btn" onclick="copyEmailCode(event, ${email.id})" title="?????">
+                        <i class="ph-bold ph-copy"></i>
+                    </button>
+                    <button class="action-btn delete" onclick="deleteEmailItem(event, ${email.id})" title="????">
+                        <i class="ph-bold ph-trash"></i>
+                    </button>
                 </div>
             </div>
         `;
     }).join('');
 }
 
-// 邮件详情
+window.copyEmailCode = function(event, id) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const email = getInboxEmailById(id);
+    const code = getEmailVerificationCode(email);
+    if (!code) {
+        showToast('??????');
+        return;
+    }
+    copyText(code);
+};
+
+window.deleteEmailItem = async function(event, id) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    try {
+        await emailAPI.delete(id);
+        showToast('???');
+        await loadInbox();
+    } catch (error) {
+        showToast(error.message || '????');
+    }
+};
+
 window.openMailDetail = async function(id) {
     try {
         const response = await emailAPI.getEmail(id);
@@ -450,7 +497,7 @@ window.openMailDetail = async function(id) {
         document.getElementById('mailDetailFrom').textContent = email.from_name || email.from_address;
         document.getElementById('mailDetailTo').textContent = email.to_address;
         document.getElementById('mailDetailTime').textContent = formatTime(email.received_at);
-        document.getElementById('mailDetailBody').innerHTML = email.html || `<pre>${email.text || ''}</pre>`;
+        document.getElementById('mailDetailBody').innerHTML = email.html || `<pre>${escapeHtml(email.text || '')}</pre>`;
 
         openModal('mailDetailModal');
     } catch (error) {

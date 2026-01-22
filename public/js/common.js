@@ -192,10 +192,38 @@ export function extractCode(text) {
 }
 
 // ============================================
+// HTML escape
+// ============================================
+export function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => {
+        switch (ch) {
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            case "'": return '&#39;';
+            default: return ch;
+        }
+    });
+}
+
+function parseDateInput(dateString) {
+    if (!dateString) return null;
+    if (dateString instanceof Date) return dateString;
+    const raw = String(dateString).trim();
+    if (!raw) return null;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) {
+        return new Date(raw.replace(' ', 'T') + 'Z');
+    }
+    return new Date(raw);
+}
+
+// ============================================
 // 时间格式化
 // ============================================
 export function formatTime(dateString) {
-    const date = new Date(dateString);
+    const date = parseDateInput(dateString);
+    if (!date || Number.isNaN(date.getTime())) return String(dateString || '');
     const now = new Date();
     const diff = now - date;
 
@@ -218,7 +246,8 @@ export function formatTime(dateString) {
 }
 
 export function formatDate(dateString) {
-    const date = new Date(dateString);
+    const date = parseDateInput(dateString);
+    if (!date || Number.isNaN(date.getTime())) return String(dateString || '');
     return date.toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -297,4 +326,10 @@ export function initCommon() {
     initIOSAlert();
     initUserMenuClose();
     initMobileSidebar();
+}
+
+// 供内联 HTML 使用的全局方法
+if (typeof window !== 'undefined') {
+    window.openModal = openModal;
+    window.closeModal = closeModal;
 }

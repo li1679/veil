@@ -282,7 +282,8 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     if (!isStrictAdmin()) return new Response('Forbidden', { status: 403 });
     try{
       const body = await request.json();
-      const username = String(body.username || '').trim();
+      const username = String(body.username || '').trim().toLowerCase();
+      if (!username) return new Response('用户名不能为空', { status: 400 });
       const role = (body.role || 'user') === 'admin' ? 'admin' : 'user';
       const mailboxLimit = Number(body.mailboxLimit || 10);
       const password = String(body.password || '').trim();
@@ -290,7 +291,14 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       if (password){ passwordHash = await sha256Hex(password); }
       const user = await createUser(db, { username, passwordHash, role, mailboxLimit });
       return Response.json(user);
-    }catch(e){ return new Response('创建失败: ' + (e?.message || e), { status: 500 }); }
+    }catch(e){
+      const msg = String(e?.message || e);
+      const lower = msg.toLowerCase();
+      if (lower.includes('unique') || lower.includes('constraint')) {
+        return new Response('用户名已存在', { status: 400 });
+      }
+      return new Response('创建失败: ' + msg, { status: 500 });
+    }
   }
 
   if (!isMock && request.method === 'PATCH' && path.startsWith('/api/users/')){

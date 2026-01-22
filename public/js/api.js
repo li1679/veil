@@ -44,11 +44,12 @@ async function request(url, options = {}) {
             return data;
         }
 
+        const text = await response.text();
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            throw new Error(text || `HTTP ${response.status}`);
         }
 
-        return await response.text();
+        return text;
     } catch (error) {
         console.error('API Error:', error);
         throw error;
@@ -287,6 +288,13 @@ export const emailAPI = {
         const response = await request(`/api/email/${id}`);
         const email = response && response.email ? response.email : response;
         return { email: mapEmailDetail(email) };
+    },
+
+    // 删除单封邮件
+    async delete(id) {
+        return request(`/api/email/${id}`, {
+            method: 'DELETE',
+        });
     },
 
     // 发送邮件
@@ -549,6 +557,13 @@ export const mailboxUserAPI = {
         const response = await request(`/api/email/${id}`);
         const email = response && response.email ? response.email : response;
         return { email: mapEmailDetail(email) };
+    },
+
+    // 删除单封邮件
+    async deleteEmail(id) {
+        return request(`/api/email/${id}`, {
+            method: 'DELETE',
+        });
     },
 
     // 发送邮件（如有权限）
