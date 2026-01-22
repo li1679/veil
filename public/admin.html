@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Veil - 管理控制�?/title>
+    <title>Veil - 管理控制�</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -75,7 +75,7 @@
                 <!-- 视图1: 生成邮箱 -->
                 <div id="view-home" class="view-section active">
                     <header class="toolbar">
-                        <a href="https://github.com/li3112522-ops/veil" class="github-pill" target="_blank">
+                        <a href="https://github.com/li1679/veil" class="github-pill" target="_blank">
                             <i class="ph-fill ph-github-logo"></i>
                             <span>GitHub</span>
                         </a>
@@ -86,13 +86,13 @@
                             <div class="current-email" id="fullEmailDisplay">
                                 <span id="prefixText"></span><span id="suffixText" style="color:var(--label-secondary);"></span>
                             </div>
-                            <div class="click-hint">点击查看收件�?/div>
+                            <div class="click-hint">点击查看收件�</div>
                         </div>
 
                         <div class="actions-row disabled" id="actionButtons">
                             <button class="btn btn-secondary" onclick="copyEmail()"><i class="ph-bold ph-copy"></i> <span>复制</span></button>
                             <button class="btn btn-secondary" onclick="refreshInbox()"><i class="ph-bold ph-arrows-clockwise"></i> <span>刷新</span></button>
-                            <button class="btn btn-primary" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发�?/span></button>
+                            <button class="btn btn-primary" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发�</span></button>
                             <button class="btn btn-danger" onclick="confirmClearInbox()"><i class="ph-bold ph-trash"></i> <span>清空</span></button>
                         </div>
 
@@ -114,7 +114,7 @@
                                         <div class="segment-bg" id="segmentBg"></div>
                                         <button class="segment-btn active" onclick="setPrefixMode(this, 'random', 0)">随机</button>
                                         <button class="segment-btn" onclick="setPrefixMode(this, 'name', 1)">人名</button>
-                                        <button class="segment-btn" onclick="setPrefixMode(this, 'custom', 2)">自定�?/button>
+                                        <button class="segment-btn" onclick="setPrefixMode(this, 'custom', 2)">自定�</button>
                                     </div>
 
                                     <input type="text" class="custom-input" id="customInputBox" placeholder="输入自定义前缀...">
@@ -150,12 +150,12 @@
 
                         <div class="inbox-section" id="inboxSection">
                             <div class="inbox-header">
-                                <div class="inbox-title"><span class="status-dot"></span> 收件�?/div>
-                                <div style="font-size:13px; color:var(--label-secondary);">监听�?/div>
+                                <div class="inbox-title"><span class="status-dot"></span> 收件�</div>
+                                <div style="font-size:13px; color:var(--label-secondary);">监听�</div>
                             </div>
                             <div id="inboxContainer" class="inbox-empty">
                                 <i class="ph ph-tray"></i>
-                                <span>暂无新邮�?/span>
+                                <span>暂无新邮�</span>
                             </div>
                         </div>
                     </div>
@@ -184,7 +184,7 @@
                                 <div>发件权限</div>
                                 <div>邮箱配额</div>
                                 <div>用户角色</div>
-                                <div>账户状�?/div>
+                                <div>账户状�</div>
                                 <div>操作</div>
                                 <div></div>
                             </div>
@@ -194,7 +194,7 @@
                         </div>
 
                         <div class="batch-bar" id="userBatchBar">
-                            <div class="batch-info">已选择 <span id="selectedUsersCount">0</span> 位用�?/div>
+                            <div class="batch-info">已选择 <span id="selectedUsersCount">0</span> 位用�</div>
                             <button class="batch-btn danger" onclick="batchDeleteUsers()"><i class="ph-bold ph-trash"></i> 批量删除</button>
                             <button class="batch-btn" style="opacity: 0.7; margin-left: 8px;" onclick="cancelUserSelection()"><i class="ph-bold ph-x"></i> 取消</button>
                         </div>
@@ -205,7 +205,7 @@
                 <div id="view-all-emails" class="view-section">
                     <div class="module-header">
                         <div class="module-title">
-                            <h1>所有邮�?/h1>
+                            <h1>所有邮�</h1>
                             <p>管理系统中所有生成的邮箱账号</p>
                         </div>
                         <div class="filter-row">
@@ -227,7 +227,7 @@
                                 </div>
                                 <div>邮箱地址</div>
                                 <div>登录密码</div>
-                                <div>登录状�?/div>
+                                <div>登录状�</div>
                                 <div>创建时间</div>
                                 <div style="text-align: right;">操作</div>
                             </div>
@@ -238,7 +238,7 @@
                     </div>
 
                     <div class="batch-bar" id="emailBatchBar">
-                        <div class="batch-info">已选择 <span id="selectedEmailsCount">0</span> �?/div>
+                        <div class="batch-info">已选择 <span id="selectedEmailsCount">0</span> �</div>
                         <button class="batch-btn" onclick="batchToggleLoginEmails(true)"><i class="ph-bold ph-check-circle"></i> 允许登录</button>
                         <button class="batch-btn" onclick="batchToggleLoginEmails(false)"><i class="ph-bold ph-prohibit"></i> 禁止登录</button>
                         <button class="batch-btn danger" onclick="batchDeleteEmails()"><i class="ph-bold ph-trash"></i> 删除</button>
@@ -257,8 +257,8 @@
         <div class="sheet-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeSendModal()">取消</button>
-                <div style="font-weight:600; font-size:16px;">新邮�?/div>
-                <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发�?/button>
+                <div style="font-weight:600; font-size:16px;">新邮�</div>
+                <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发�</button>
             </div>
             <div class="sheet-body">
                 <div class="compose-field">
@@ -307,7 +307,7 @@
             <div class="sheet-header mailbox-viewer-header">
                 <button class="sheet-btn" onclick="closeMailboxViewer()">关闭</button>
                 <div class="viewer-title">
-                    <div style="font-weight:600; font-size:16px;">收件�?/div>
+                    <div style="font-weight:600; font-size:16px;">收件�</div>
                     <div class="viewer-address" id="mailboxViewerAddress"></div>
                 </div>
                 <button class="sheet-btn" onclick="refreshMailboxViewer()">刷新</button>
@@ -331,7 +331,7 @@
 
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                 <div class="form-row">
-                    <label class="form-label">登录用户�?/label>
+                    <label class="form-label">登录用户�</label>
                     <input type="text" class="form-input" id="inputLoginUsername" placeholder="请输入用户名">
                 </div>
                 <div class="form-row">
@@ -348,16 +348,16 @@
                 <div class="form-row">
                     <label class="form-label">用户角色</label>
                     <select class="form-input" id="inputRole">
-                        <option value="User">普通用�?/option>
-                        <option value="Admin">管理�?/option>
+                        <option value="User">普通用�</option>
+                        <option value="Admin">管理�</option>
                     </select>
                 </div>
             </div>
 
             <div class="form-row" style="display:flex; justify-content:space-between; align-items:center; background:#F9F9F9; padding:12px; border-radius:8px;">
                 <div>
-                    <div style="font-size:14px; font-weight:500;">允许发送邮�?/div>
-                    <div style="font-size:12px; color:#3C3C4399;">开启后该用户可发送邮�?/div>
+                    <div style="font-size:14px; font-weight:500;">允许发送邮�</div>
+                    <div style="font-size:12px; color:#3C3C4399;">开启后该用户可发送邮�</div>
                 </div>
                 <div class="ios-switch" id="inputSendSwitch" onclick="this.classList.toggle('on')">
                     <div class="ios-switch-thumb"></div>
@@ -386,8 +386,8 @@
     <!-- 分配邮箱模态框 -->
     <div class="modal-overlay" id="assignEmailModal">
         <div class="modal-card">
-            <h3 style="font-size:18px; font-weight:700; margin-bottom:20px;">分配新邮�?/h3>
-            <p style="font-size:14px; color:#3C3C4399; margin-bottom:20px;">手动指定该用户的新邮箱地址�?/p>
+            <h3 style="font-size:18px; font-weight:700; margin-bottom:20px;">分配新邮�</h3>
+            <p style="font-size:14px; color:#3C3C4399; margin-bottom:20px;">手动指定该用户的新邮箱地址�</p>
 
             <div class="form-row">
                 <label class="form-label">邮箱地址</label>
@@ -415,7 +415,7 @@
                 当前正在修改 <span id="pwdEditEmail" style="color: var(--accent-blue); font-weight: 500;"></span> 的密码�?
             </p>
 
-            <label style="font-size: 13px; font-weight: 600; color: #333;">新密�?/label>
+            <label style="font-size: 13px; font-weight: 600; color: #333;">新密�</label>
             <input type="password" class="form-input" id="newPasswordInput" placeholder="输入新密�?>
             <div style="font-size: 12px; color: #999; margin-top: 6px; display: flex; align-items: center; gap: 4px;">
                 <i class="ph-fill ph-info"></i> 默认密码通常为邮箱地址本身
@@ -433,7 +433,7 @@
         <div class="ios-alert-box">
             <div class="ios-alert-content">
                 <h3 id="iosAlertTitle" class="ios-alert-title">确认操作</h3>
-                <p id="iosAlertDesc" class="ios-alert-desc">确定要继续吗�?/p>
+                <p id="iosAlertDesc" class="ios-alert-desc">确定要继续吗�</p>
             </div>
             <div class="ios-alert-buttons">
                 <button class="ios-alert-btn cancel">取消</button>

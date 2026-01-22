@@ -4,7 +4,7 @@
 
 ## 一键部署
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/li3112522-ops/veil)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/li1679/veil)
 
 ### [点击查看一键部署指南](docs/yijianbushu.md)
 
@@ -38,7 +38,7 @@
 
 ## 部署步骤
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/li3112522-ops/veil)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/li1679/veil)
 
 ### [一键部署指南](docs/yijianbushu.md)
 
@@ -84,7 +84,7 @@ RESEND_API_KEY='{"domain1.com":"re_key1","domain2.com":"re_key2"}'
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=li3112522-ops/veil&type=Date)](https://www.star-history.com/#li3112522-ops/veil&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=li1679/veil&type=Date)](https://www.star-history.com/#li1679/veil&Date)
 
 ## 许可证
 
