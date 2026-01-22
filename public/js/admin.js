@@ -378,6 +378,15 @@ window.copyEmail = function() {
     }
 };
 
+window.copyMailboxAddress = function(address, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!address) return;
+    copyText(address);
+};
+
 window.refreshInbox = async function() {
     await loadInbox();
     showToast('已刷新');
@@ -670,10 +679,11 @@ function renderUserTable() {
         const subEmailsHTML = subEmails.length === 0
             ? '<div style="padding:10px; color:#999; font-size:13px; text-align:center;">暂无分配邮箱</div>'
             : subEmails.map(mail => {
+                const safeAddress = String(mail.address || '').replace(/'/g, "\\'");
                 const actions = selectable
                     ? `
                         <div class="email-actions">
-                            <button class="action-btn" onclick="copyText('${mail.address}')"><i class="ph-bold ph-copy"></i></button>
+                            <button class="action-btn" onclick="copyMailboxAddress('${safeAddress}', event)"><i class="ph-bold ph-copy"></i></button>
                             <button class="action-btn delete" onclick="deleteSubEmail(${user.id}, ${mail.id})"><i class="ph-bold ph-trash"></i></button>
                         </div>
                     `
@@ -1126,7 +1136,7 @@ function renderAllMailboxes() {
                     <button class="icon-btn" title="查看收件箱" onclick="openMailboxViewer('${safeAddress}')">
                         <i class="ph-bold ph-envelope-open"></i>
                     </button>
-                    <button class="icon-btn" title="复制邮箱" onclick="copyText('${item.address}')">
+                    <button class="icon-btn" title="复制邮箱" onclick="copyMailboxAddress('${safeAddress}', event)">
                         <i class="ph-bold ph-copy"></i>
                     </button>
                     <button class="icon-btn delete" title="删除" onclick="deleteSingleMailbox(${item.id})">
