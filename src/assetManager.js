@@ -127,8 +127,17 @@ export class AssetManager {
       return await this.handleMailboxPage(mappedRequest, env, JWT_TOKEN);
     }
 
-    // 其他静态资源直接返回
-    return env.ASSETS.fetch(mappedRequest);
+    // 其他静态资源直接返回（HTML 统一补齐 UTF-8 头，避免乱码）
+    const resp = await env.ASSETS.fetch(mappedRequest);
+    try {
+      const targetPath = new URL(mappedRequest.url).pathname;
+      if (targetPath.endsWith('.html')) {
+        return await this.wrapHtmlResponse(resp);
+      }
+    } catch (_) {
+      // ignore and return raw response
+    }
+    return resp;
   }
 
   /**
@@ -361,7 +370,8 @@ export class AssetManager {
       }
     }
     
-    return env.ASSETS.fetch(request);
+    const resp = await env.ASSETS.fetch(request);
+    return await this.wrapHtmlResponse(resp);
   }
 
   /**
@@ -382,7 +392,8 @@ export class AssetManager {
     if (!isStrictAdmin && !isGuest){
       return Response.redirect(new URL('/', url).toString(), 302);
     }
-    return env.ASSETS.fetch(request);
+    const resp = await env.ASSETS.fetch(request);
+    return await this.wrapHtmlResponse(resp);
   }
 
   /**
