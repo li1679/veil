@@ -9,7 +9,6 @@ import { setStorage, getStorage, removeStorage } from './common.js';
 // 用户角色常量
 const ROLES = {
     STRICT_ADMIN: 'StrictAdmin',
-    ADMIN: 'Admin',
     USER: 'User',
     MAILBOX_USER: 'MailboxUser',
 };
@@ -24,7 +23,7 @@ function mapRole(backendRole, strictAdmin = false) {
     if (strictAdmin) return ROLES.STRICT_ADMIN;
 
     const roleMap = {
-        'admin': ROLES.ADMIN,
+        'admin': ROLES.USER,
         'user': ROLES.USER,
         'mailbox': ROLES.MAILBOX_USER,
     };
@@ -119,7 +118,6 @@ export function getRedirectUrl(user = currentUser) {
 
     switch (user.role) {
         case ROLES.STRICT_ADMIN:
-        case ROLES.ADMIN:
             return '/admin.html';
         case ROLES.USER:
             return '/user.html';
@@ -153,7 +151,7 @@ async function requireAuth(allowedRoles = []) {
 
 // 管理员页面守卫
 export async function requireAdmin() {
-    return requireAuth([ROLES.STRICT_ADMIN, ROLES.ADMIN]);
+    return requireAuth([ROLES.STRICT_ADMIN]);
 }
 
 // 普通用户页面守卫

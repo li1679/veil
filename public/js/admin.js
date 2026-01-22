@@ -81,7 +81,7 @@ function updateUserInfo() {
         nameEl.textContent = currentUser.name || currentUser.username;
     }
     if (badgeEl && currentUser) {
-        badgeEl.textContent = currentUser.role === 'StrictAdmin' ? 'Super Admin' : 'Admin';
+        badgeEl.textContent = 'Super Admin';
     }
 }
 
@@ -735,6 +735,20 @@ function renderUserTable() {
             ? `<button class="btn btn-primary" style="height:28px; font-size:12px;" onclick="openAssignModal(${user.id})"><i class="ph-bold ph-plus"></i> 分配新邮箱</button>`
             : `<div class="locked-hint">只读</div>`;
 
+        const detailsPanel = locked
+            ? ''
+            : `
+                <div class="details-panel" onclick="event.stopPropagation()">
+                    <div class="panel-content">
+                        <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 600; color: #3C3C4399;">已分配邮箱列表 (${used})</span>
+                            ${assignButton}
+                        </div>
+                        <div id="sub-emails-${user.id}">${subEmailsHTML}</div>
+                    </div>
+                </div>
+            `;
+
         return `
             <div class="user-block ${isSelected ? 'selected' : ''}" id="user-block-${user.id}" style="${isSelected ? 'background-color: #F2F8FF;' : ''}">
                 <div class="t-row" onclick="toggleExpand(${user.id}, event)">
@@ -764,18 +778,10 @@ function renderUserTable() {
                         ${actionButtons}
                     </div>
                     <div class="col-meta" style="text-align:right;">
-                        <i class="ph-bold ph-caret-right chevron"></i>
+                        ${locked ? '<i class="ph-bold ph-lock"></i>' : '<i class="ph-bold ph-caret-right chevron"></i>'}
                     </div>
                 </div>
-                <div class="details-panel" onclick="event.stopPropagation()">
-                    <div class="panel-content">
-                        <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 13px; font-weight: 600; color: #3C3C4399;">已分配邮箱列表 (${used})</span>
-                            ${assignButton}
-                        </div>
-                        <div id="sub-emails-${user.id}">${subEmailsHTML}</div>
-                    </div>
-                </div>
+                ${detailsPanel}
             </div>
         `;
     }).join('');
@@ -783,6 +789,8 @@ function renderUserTable() {
 
 window.toggleExpand = function(userId, event) {
     if (event && (event.target.closest('button') || event.target.closest('.ios-switch') || event.target.closest('select') || event.target.closest('.custom-checkbox'))) return;
+    const user = users.find(u => u.id === userId);
+    if (user && isLockedUser(user)) return;
     const block = document.getElementById(`user-block-${userId}`);
     if (block) block.classList.toggle('expanded');
 };
@@ -917,7 +925,6 @@ window.openUserModal = function() {
     document.getElementById('inputLoginUsername').value = '';
     document.getElementById('inputPassword').value = '';
     document.getElementById('inputQuota').value = '10';
-    document.getElementById('inputRole').value = 'User';
     document.getElementById('inputSendSwitch').classList.remove('on');
     document.getElementById('inputInitialEmail').value = '';
     document.getElementById('initialEmailRow').style.display = 'block';
@@ -940,7 +947,6 @@ window.openEditUser = function(userId) {
     document.getElementById('inputLoginUsername').value = user.username;
     document.getElementById('inputPassword').value = '';
     document.getElementById('inputQuota').value = user.quota || 10;
-    document.getElementById('inputRole').value = user.role;
 
     const switchEl = document.getElementById('inputSendSwitch');
     if (user.can_send) {
@@ -963,7 +969,6 @@ window.saveUser = async function() {
     const username = document.getElementById('inputLoginUsername').value.trim();
     const password = document.getElementById('inputPassword').value;
     const quota = parseInt(document.getElementById('inputQuota').value) || 10;
-    const role = document.getElementById('inputRole').value;
     const canSend = document.getElementById('inputSendSwitch').classList.contains('on');
 
     if (!username) {
@@ -971,7 +976,7 @@ window.saveUser = async function() {
         return;
     }
 
-    const userData = { name, username, quota, role, can_send: canSend };
+    const userData = { name, username, quota, can_send: canSend };
     if (password) userData.password = password;
 
     try {

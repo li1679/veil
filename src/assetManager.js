@@ -199,7 +199,7 @@ export class AssetManager {
       }
     } else {
       // 其他受保护页面
-      const isAllowed = (payload.role === 'admin' || payload.role === 'guest' || payload.role === 'mailbox');
+      const isAllowed = (payload.role === 'admin' || payload.role === 'guest');
       if (!isAllowed) {
         // 已登录但权限不足：引导回首页
         return Response.redirect(new URL('/', url).toString(), 302);
@@ -317,8 +317,15 @@ export class AssetManager {
       return env.ASSETS.fetch(loadingReq);
     }
     
-    const isAllowed = (payload.role === 'admin' || payload.role === 'guest' || payload.role === 'mailbox');
-    if (!isAllowed) {
+    const ADMIN_NAME = String(env.ADMIN_NAME || 'admin').trim().toLowerCase();
+    const username = String(payload.username || '').trim();
+    const normalizedUsername = username.toLowerCase();
+    const isStrictAdmin = (payload.role === 'admin') && (
+      username === '__root__' || normalizedUsername === ADMIN_NAME
+    );
+    const isGuest = (payload.role === 'guest');
+
+    if (!isStrictAdmin && !isGuest) {
       // 返回首页
       return Response.redirect(new URL('/', url).toString(), 302);
     }
@@ -387,7 +394,12 @@ export class AssetManager {
       );
       return env.ASSETS.fetch(loadingReq);
     }
-    const isStrictAdmin = (payload.role === 'admin' && (payload.username === '__root__' || payload.username));
+    const ADMIN_NAME = String(env.ADMIN_NAME || 'admin').trim().toLowerCase();
+    const username = String(payload.username || '').trim();
+    const normalizedUsername = username.toLowerCase();
+    const isStrictAdmin = (payload.role === 'admin') && (
+      username === '__root__' || normalizedUsername === ADMIN_NAME
+    );
     const isGuest = (payload.role === 'guest');
     if (!isStrictAdmin && !isGuest){
       return Response.redirect(new URL('/', url).toString(), 302);

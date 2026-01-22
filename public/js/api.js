@@ -66,13 +66,7 @@ function normalizeMailboxResponse(response) {
 }
 
 function normalizeUserRole(role) {
-    const lower = String(role || '').toLowerCase();
-    return lower === 'admin' ? 'Admin' : 'User';
-}
-
-function toApiRole(role) {
-    const lower = String(role || '').toLowerCase();
-    return lower === 'admin' ? 'admin' : 'user';
+    return 'User';
 }
 
 function normalizeUserQuota(user) {
@@ -382,7 +376,6 @@ export const userAPI = {
         const payload = {
             username: userData.username,
             password: userData.password,
-            role: toApiRole(userData.role),
             mailboxLimit: normalizeUserQuota(userData),
         };
 
@@ -416,7 +409,6 @@ export const userAPI = {
         if (typeof userData.mailbox_limit !== 'undefined') payload.mailboxLimit = userData.mailbox_limit;
         if (typeof userData.can_send !== 'undefined') payload.can_send = userData.can_send ? 1 : 0;
         if (typeof userData.password !== 'undefined' && userData.password !== '') payload.password = userData.password;
-        if (typeof userData.role !== 'undefined') payload.role = toApiRole(userData.role);
         if (typeof userData.username !== 'undefined' && userData.username !== '') payload.username = userData.username;
 
         return request(`/api/users/${id}`, {

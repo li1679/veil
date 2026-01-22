@@ -104,7 +104,7 @@ SELECT * FROM messages WHERE mailbox_id = 123 ORDER BY received_at DESC;
 | Worker 初始化 | 50 次 | 200 行 | 10,000 |
 | 查看邮件列表 | 10 用户 × 20 次 | 20 行 | 4,000 |
 | 查看邮件详情 | 10 用户 × 50 次 | 1 行 | 500 |
-| 管理员查看用户列表 | 5 次 | 5,050 行 | 25,250 |
+| 超级管理员查看用户列表 | 5 次 | 5,050 行 | 25,250 |
 | 超管查看配额（COUNT） | 10 次 | 10,000 行 | 100,000 |
 | 接收新邮件 | 200 封 | 5 行 | 1,000 |
 | 用户配额查询 | 100 次 | 100 行 | 10,000 |
@@ -123,7 +123,7 @@ SELECT COUNT(1) AS count FROM mailboxes;
 // 10,000 个邮箱 = 10,000 行读取
 ```
 
-### 🔴 2. 管理员频繁查看用户列表
+### 🔴 2. 超级管理员频繁查看用户列表
 ```javascript
 // listUsersWithCounts() - 包含 JOIN 和子查询
 // 每次查询扫描 users + user_mailboxes 的所有行
@@ -215,4 +215,3 @@ function logQuery(query, estimatedRows) {
 6. ⚠️ **Worker 频繁重启**（考虑使用持久化缓存）
 
 建议优先优化超管配额查询的缓存时间！
-

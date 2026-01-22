@@ -25,7 +25,7 @@
 - 邮件发送（Resend）
 
 ### 用户系统
-- 四层权限：StrictAdmin / Admin / User / MailboxUser
+- 三层权限：StrictAdmin / User / MailboxUser
 - 用户管理（创建/编辑/删除）
 - 邮箱配额管理
 - 发件权限控制

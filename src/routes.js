@@ -350,12 +350,12 @@ export function createRouter() {
           const row = results[0];
           const ok = await verifyPassword(password, row.password_hash || '');
           if (ok) {
-            const role = (row.role === 'admin') ? 'admin' : 'user';
+            const role = 'user';
             const token = await createJwt(JWT_TOKEN, { role, username: name, userId: row.id });
             const headers = new Headers({ 'Content-Type': 'application/json' });
             headers.set('Set-Cookie', buildSessionCookie(token, request.url));
-            const canSend = role === 'admin' ? 1 : (row.can_send ? 1 : 0);
-            const mailboxLimit = role === 'admin' ? (row.mailbox_limit || 20) : (row.mailbox_limit || 10);
+            const canSend = row.can_send ? 1 : 0;
+            const mailboxLimit = row.mailbox_limit || 10;
             return new Response(JSON.stringify({ success: true, role, can_send: canSend, mailbox_limit: mailboxLimit }), { headers });
           }
         }
@@ -421,12 +421,15 @@ export function createRouter() {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const role = authPayload.role || 'admin';
+    let role = authPayload.role || 'user';
     const username = authPayload.username || '';
     const strictAdmin = (role === 'admin') && (
       String(username || '').trim().toLowerCase() === ADMIN_NAME ||
       String(username || '') === '__root__'
     );
+    if (role === 'admin' && !strictAdmin) {
+      role = 'user';
+    }
 
     let userId = Number(authPayload.userId || 0);
     let canSend = 0;

@@ -84,10 +84,6 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     if (ADMIN_NAME){ return uname === ADMIN_NAME; }
     return true;
   }
-  function isAdminRole(){
-    const p = getJwtPayload();
-    return !!p && p.role === 'admin';
-  }
   function isSuperAdminName(username){
     const uname = String(username || '').trim().toLowerCase();
     if (!uname) return false;
@@ -139,7 +135,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     globalThis.__MOCK_USERS__ = [
       { id: 1, username: 'demo1', role: 'user', can_send: 0, mailbox_limit: 5, created_at: now.toISOString().replace('T',' ').slice(0,19) },
       { id: 2, username: 'demo2', role: 'user', can_send: 0, mailbox_limit: 8, created_at: now.toISOString().replace('T',' ').slice(0,19) },
-      { id: 3, username: 'operator', role: 'admin', can_send: 0, mailbox_limit: 20, created_at: now.toISOString().replace('T',' ').slice(0,19) },
+      { id: 3, username: 'operator', role: 'user', can_send: 0, mailbox_limit: 20, created_at: now.toISOString().replace('T',' ').slice(0,19) },
     ];
     globalThis.__MOCK_USER_MAILBOXES__ = new Map(); // userId -> [{ address, created_at, is_pinned }]
     // 为每个演示用户预生成若干邮箱，便于列表展示
@@ -187,7 +183,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       if (!username) return new Response('用户名不能为空', { status: 400 });
       const exists = (globalThis.__MOCK_USERS__ || []).some(u => u.username === username);
       if (exists) return new Response('用户名已存在', { status: 400 });
-      const role = (body.role === 'admin') ? 'admin' : 'user';
+      const role = 'user';
       const mailbox_limit = Math.max(0, Number(body.mailboxLimit || 10));
       const id = ++globalThis.__MOCK_USER_LAST_ID__;
       const item = { id, username, role, can_send: 0, mailbox_limit, created_at: new Date().toISOString().replace('T',' ').slice(0,19) };
@@ -203,7 +199,6 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     try{
       const body = await request.json();
       if (typeof body.mailboxLimit !== 'undefined') list[idx].mailbox_limit = Math.max(0, Number(body.mailboxLimit));
-      if (typeof body.role === 'string') list[idx].role = (body.role === 'admin' ? 'admin' : 'user');
       if (typeof body.can_send !== 'undefined') list[idx].can_send = body.can_send ? 1 : 0;
       return Response.json({ success: true });
     }catch(_){ return new Response('更新失败', { status: 500 }); }
@@ -303,7 +298,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
 
   // ================= 用户管理接口（仅非演示模式） =================
   if (!isMock && path === '/api/users' && request.method === 'GET'){
-    if (!isStrictAdmin() && !isAdminRole()) return new Response('Forbidden', { status: 403 });
+    if (!isStrictAdmin()) return new Response('Forbidden', { status: 403 });
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 100);
     const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10), 0);
     const sort = url.searchParams.get('sort') || 'desc';
@@ -324,7 +319,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       const username = String(body.username || '').trim().toLowerCase();
       if (!username) return new Response('用户名不能为空', { status: 400 });
       if (isSuperAdminName(username)) return new Response('该用户名为超级管理员保留', { status: 400 });
-      const role = (body.role || 'user') === 'admin' ? 'admin' : 'user';
+      const role = 'user';
       const mailboxLimit = Number(body.mailboxLimit || 10);
       const password = String(body.password || '').trim();
       let passwordHash = null;
@@ -352,7 +347,6 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       const body = await request.json();
       const fields = {};
       if (typeof body.mailboxLimit !== 'undefined') fields.mailbox_limit = Math.max(0, Number(body.mailboxLimit));
-      if (typeof body.role === 'string') fields.role = (body.role === 'admin' ? 'admin' : 'user');
       if (typeof body.can_send !== 'undefined') fields.can_send = body.can_send ? 1 : 0;
       if (typeof body.password === 'string' && body.password){ fields.password_hash = await sha256Hex(String(body.password)); }
       await updateUser(db, id, fields);
@@ -368,8 +362,69 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       const target = await db.prepare('SELECT username FROM users WHERE id = ? LIMIT 1').bind(id).all();
       if (!target?.results?.length) return new Response('用户不存在', { status: 404 });
       if (isSuperAdminName(target.results[0].username)) return new Response('Forbidden', { status: 403 });
-      await deleteUser(db, id);
-      return Response.json({ success: true });
+      const { invalidateMailboxCache, invalidateUserQuotaCache, invalidateSystemStatCache } = await import('./cacheHelper.js');
+
+      // 查询用户已分配的邮箱
+      const { results: mailboxRows } = await db.prepare(`
+        SELECT um.mailbox_id AS mailbox_id, m.address AS address
+        FROM user_mailboxes um
+        JOIN mailboxes m ON m.id = um.mailbox_id
+        WHERE um.user_id = ?
+      `).bind(id).all();
+
+      const mailboxIds = (mailboxRows || [])
+        .map((row) => Number(row?.mailbox_id || 0))
+        .filter((mid) => mid > 0);
+
+      // 如果某个邮箱仍被其他用户占用，则仅解绑，不删除邮箱/邮件（防止误删共享邮箱）
+      let deletableMailboxIds = mailboxIds;
+      if (mailboxIds.length) {
+        const placeholders = mailboxIds.map(() => '?').join(',');
+        const { results: otherOwners } = await db.prepare(`
+          SELECT mailbox_id, COUNT(1) AS c
+          FROM user_mailboxes
+          WHERE mailbox_id IN (${placeholders}) AND user_id <> ?
+          GROUP BY mailbox_id
+        `).bind(...mailboxIds, id).all();
+        const shared = new Set((otherOwners || [])
+          .filter((row) => Number(row?.c || 0) > 0)
+          .map((row) => Number(row?.mailbox_id || 0))
+          .filter((mid) => mid > 0));
+        deletableMailboxIds = mailboxIds.filter((mid) => !shared.has(mid));
+      }
+
+      // 简易事务，降低并发插入导致的外键失败概率
+      try { await db.exec('BEGIN'); } catch(_) {}
+      try {
+        if (deletableMailboxIds.length) {
+          const placeholders = deletableMailboxIds.map(() => '?').join(',');
+          await db.prepare(`DELETE FROM messages WHERE mailbox_id IN (${placeholders})`)
+            .bind(...deletableMailboxIds).run();
+          await db.prepare(`DELETE FROM mailboxes WHERE id IN (${placeholders})`)
+            .bind(...deletableMailboxIds).run();
+        }
+
+        await deleteUser(db, id);
+
+        try { await db.exec('COMMIT'); } catch(_) {}
+      } catch (err) {
+        try { await db.exec('ROLLBACK'); } catch(_) {}
+        throw err;
+      }
+
+      // 缓存失效
+      invalidateUserQuotaCache(id);
+      if (deletableMailboxIds.length) {
+        (mailboxRows || [])
+          .filter((row) => deletableMailboxIds.includes(Number(row?.mailbox_id || 0)))
+          .forEach((row) => invalidateMailboxCache(row?.address));
+        invalidateSystemStatCache('total_mailboxes');
+      }
+
+      return Response.json({
+        success: true,
+        deleted_mailboxes: deletableMailboxIds.length
+      });
     }
     catch(e){ return new Response('删除失败: ' + (e?.message || e), { status: 500 }); }
   }
@@ -567,8 +622,8 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     const payload = getJwtPayload();
     if (!payload) return false;
     
-    // 管理员默认允许
-    if (payload.role === 'admin') return true;
+    // 超级管理员默认允许
+    if (isStrictAdmin()) return true;
     
     // 普通用户检查 can_send 权限（使用缓存）
     if (payload.userId) {

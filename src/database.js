@@ -551,7 +551,7 @@ export async function createUser(db, { username, passwordHash = null, role = 'us
  * @returns {Promise<void>} 更新完成后无返回值
  */
 export async function updateUser(db, userId, fields){
-  const allowed = ['role', 'mailbox_limit', 'password_hash', 'can_send'];
+  const allowed = ['mailbox_limit', 'password_hash', 'can_send'];
   const setClauses = [];
   const values = [];
   for (const key of allowed){
@@ -765,4 +765,3 @@ export async function getTotalMailboxCount(db) {
     return 0;
   }
 }
-

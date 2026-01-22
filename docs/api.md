@@ -75,7 +75,7 @@
 - `GET /api/users/{userId}/mailboxes` - 获取指定用户的邮箱列表
   - 返回: 邮箱数组（address/created_at）
 - `POST /api/users` - 创建用户
-  - 参数: `{ username, password, role }`（role: `user` | `admin`）
+  - 参数: `{ username, password }`（用户角色固定为 `user`）
   - 返回: `{ success: true }`
 - `PATCH /api/users/{userId}` - 更新用户
   - 参数示例: `{ username?, password?, mailboxLimit?, can_send?, role? }`
