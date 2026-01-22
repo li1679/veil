@@ -182,7 +182,7 @@ export async function authMiddleware(context) {
   const url = new URL(request.url);
   
   // 跳过不需要认证的路由
-  const publicPaths = ['/api/login', '/api/logout'];
+  const publicPaths = ['/api/login', '/api/logout', '/receive'];
   if (publicPaths.includes(url.pathname)) {
     return null;
   }

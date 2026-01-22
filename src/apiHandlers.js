@@ -94,6 +94,29 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     if (uname === '__root__') return true;
     return ADMIN_NAME ? uname === ADMIN_NAME : false;
   }
+
+  async function resolveAdminUserId(){
+    const payload = getJwtPayload();
+    let uid = Number(payload?.userId || 0);
+    if (uid) return uid;
+    if (!isStrictAdmin()) return 0;
+    const adminName = String(options?.adminName || payload?.username || '').trim().toLowerCase();
+    if (!adminName) return 0;
+    try{
+      const { results } = await db.prepare('SELECT id FROM users WHERE username = ? LIMIT 1')
+        .bind(adminName).all();
+      if (results && results.length) {
+        return Number(results[0].id);
+      }
+      await db.prepare("INSERT INTO users (username, role, can_send, mailbox_limit) VALUES (?, 'admin', 1, 9999)")
+        .bind(adminName).run();
+      const again = await db.prepare('SELECT id FROM users WHERE username = ? LIMIT 1')
+        .bind(adminName).all();
+      return Number(again?.results?.[0]?.id || 0);
+    }catch(_){
+      return 0;
+    }
+  }
   
   async function sha256Hex(text){
     const enc = new TextEncoder();
@@ -264,9 +287,9 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
 
       // 访客模式不写入历史
       if (!isMock) {
-        const payload = getJwtPayload();
-        if (payload?.userId) {
-          await assignMailboxToUser(db, { userId: payload.userId, address: email });
+        const userId = await resolveAdminUserId();
+        if (userId) {
+          await assignMailboxToUser(db, { userId, address: email });
           return Response.json({ address: email, expires: Date.now() + 3600000 });
         }
         await getOrCreateMailboxId(db, email);
@@ -427,8 +450,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       const email = `${local}@${chosenDomain}`;
 
       try{
-        const payload = getJwtPayload();
-        const userId = payload?.userId;
+        const userId = await resolveAdminUserId();
 
         // 检查邮箱是否已存在以及权限
         const ownership = await checkMailboxOwnership(db, email, userId);

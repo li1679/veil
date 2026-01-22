@@ -314,7 +314,22 @@ export class AssetManager {
       return Response.redirect(new URL('/', url).toString(), 302);
     }
     
-    return env.ASSETS.fetch(request);
+    const resp = await env.ASSETS.fetch(request);
+    return await this.wrapHtmlResponse(resp);
+  }
+
+  async wrapHtmlResponse(resp) {
+    try {
+      const text = await resp.text();
+      return new Response(text, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+        }
+      });
+    } catch (_) {
+      return resp;
+    }
   }
 
   /**
