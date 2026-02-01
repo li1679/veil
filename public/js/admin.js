@@ -32,6 +32,56 @@ function getLastMailboxStorageKey() {
     return `veil_last_mailbox_admin_${username}`;
 }
 
+function normalizeEmailAddress(address) {
+    return String(address || '').trim().toLowerCase();
+}
+
+function clearCurrentEmailState() {
+    currentEmail = null;
+    removeStorage(getLastMailboxStorageKey());
+    document.getElementById('fullEmailDisplay')?.classList.remove('visible');
+    document.getElementById('actionButtons')?.classList.add('disabled');
+    stopInboxPoll();
+    try {
+        renderInbox([]);
+    } catch (_) {
+        // ignore
+    }
+}
+
+function applyMailboxDeletionsToHome(addresses = []) {
+    const normalized = (addresses || []).map(normalizeEmailAddress).filter(Boolean);
+    if (normalized.length === 0) return;
+    const set = new Set(normalized);
+
+    emailHistory = (emailHistory || []).filter((h) => !set.has(normalizeEmailAddress(h?.email)));
+
+    const last = normalizeEmailAddress(getStorage(getLastMailboxStorageKey(), null));
+    if (last && set.has(last)) {
+        removeStorage(getLastMailboxStorageKey());
+    }
+
+    if (currentEmail && set.has(normalizeEmailAddress(currentEmail))) {
+        clearCurrentEmailState();
+    }
+
+    if (viewerMailbox && set.has(normalizeEmailAddress(viewerMailbox))) {
+        try {
+            window.closeMailboxViewer?.();
+        } catch (_) {
+            viewerMailbox = null;
+            viewerEmails = [];
+            try {
+                closeModal('mailboxViewerModal');
+            } catch (_) {
+                // ignore
+            }
+        }
+    }
+
+    renderHistory();
+}
+
 // 配置
 let prefixMode = 'random';
 let selectedDomain = '';
@@ -268,8 +318,19 @@ function setCurrentEmail(email) {
 // ============================================
 async function loadHistory() {
     try {
-        const response = await mailboxAPI.getMailboxes({ scope: 'own' });
-        emailHistory = (response.mailboxes || []).map(m => ({
+        // 拉全量历史（后端默认 limit=10；这里分页拉取，保证“重新进入还是退出前的样子”）
+        const limit = 50;
+        let offset = 0;
+        let mailboxes = [];
+        while (mailboxes.length < 500) {
+            const response = await mailboxAPI.getMailboxes({ scope: 'own', limit, offset });
+            const batch = (response.mailboxes || []);
+            mailboxes = mailboxes.concat(batch);
+            if (batch.length < limit) break;
+            offset += limit;
+        }
+
+        emailHistory = mailboxes.map(m => ({
             id: m.id,
             email: m.address,
             time: formatTime(m.created_at),
@@ -1401,6 +1462,8 @@ window.toggleLoginAllowed = async function(id) {
 };
 
 window.deleteSingleMailbox = function(id) {
+    const target = allMailboxes.find(m => m.id === id);
+    const targetAddress = target?.address || '';
     openIOSAlert('删除邮箱', '确定要删除此邮箱吗？此操作无法撤销。', async () => {
         try {
             await adminMailboxAPI.delete(id);
@@ -1409,6 +1472,7 @@ window.deleteSingleMailbox = function(id) {
                 selectedEmailIds.delete(id);
                 renderAllMailboxes();
             });
+            applyMailboxDeletionsToHome([targetAddress]);
             showToast('已删除');
         } catch (error) {
             showToast(error.message || '删除失败');
@@ -1423,12 +1487,14 @@ window.batchDeleteEmails = function() {
     openIOSAlert('批量删除', `确定删除选中的 ${count} 个邮箱吗？`, async () => {
         try {
             const ids = Array.from(selectedEmailIds);
+            const addresses = ids.map((id) => allMailboxes.find((m) => m.id === id)?.address).filter(Boolean);
             await adminMailboxAPI.batchDelete(ids);
             animateBatchDelete(ids, 'email-row-', () => {
                 allMailboxes = allMailboxes.filter(m => !selectedEmailIds.has(m.id));
                 selectedEmailIds.clear();
                 renderAllMailboxes();
             });
+            applyMailboxDeletionsToHome(addresses);
             showToast(`已删除 ${count} 个邮箱`);
         } catch (error) {
             showToast(error.message || '删除失败');

@@ -96,7 +96,24 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     let uid = Number(payload?.userId || 0);
     if (uid) return uid;
     if (!isStrictAdmin()) return 0;
-    return 0;
+
+    // 严格管理员但 token 没有 userId（例如旧会话 / root override）：
+    // 尝试把邮箱绑定到 ADMIN_NAME 对应的 users 记录，确保“scope=own”历史一致可回显
+    const adminName = String(ADMIN_NAME || options?.adminName || 'admin').trim().toLowerCase();
+    if (!adminName || adminName === '__root__') return 0;
+    try {
+      await db.prepare(
+        "INSERT OR IGNORE INTO users (username, password_hash, role, can_send, mailbox_limit) VALUES (?, NULL, 'admin', 1, 999999)"
+      ).bind(adminName).run();
+      await db.prepare(
+        "UPDATE users SET role = 'admin', can_send = 1, mailbox_limit = 999999 WHERE username = ?"
+      ).bind(adminName).run();
+      const { results } = await db.prepare('SELECT id FROM users WHERE username = ? LIMIT 1').bind(adminName).all();
+      uid = Number(results?.[0]?.id || 0);
+      return uid || 0;
+    } catch (_) {
+      return 0;
+    }
   }
   
   async function sha256Hex(text){

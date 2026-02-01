@@ -229,8 +229,19 @@ function setCurrentEmail(email) {
 // ============================================
 async function loadHistory() {
     try {
-        const response = await mailboxAPI.getMailboxes();
-        emailHistory = (response.mailboxes || []).map(m => ({
+        // 拉全量历史（后端默认 limit=10；这里分页拉取）
+        const limit = 50;
+        let offset = 0;
+        let mailboxes = [];
+        while (mailboxes.length < 500) {
+            const response = await mailboxAPI.getMailboxes({ limit, offset });
+            const batch = (response.mailboxes || []);
+            mailboxes = mailboxes.concat(batch);
+            if (batch.length < limit) break;
+            offset += limit;
+        }
+
+        emailHistory = mailboxes.map(m => ({
             id: m.id,
             email: m.address,
             time: formatTime(m.created_at),

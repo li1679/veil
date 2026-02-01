@@ -172,9 +172,18 @@ function mapEmailDetail(item) {
 
 async function deleteMailboxByAddress(address) {
     if (!address) throw new Error('Missing address');
-    return request(`/api/mailboxes?address=${encodeURIComponent(address)}`, {
-        method: 'DELETE',
-    });
+    try {
+        return await request(`/api/mailboxes?address=${encodeURIComponent(address)}`, {
+            method: 'DELETE',
+        });
+    } catch (error) {
+        // 删除接口幂等化：已不存在也视为“已删除”，避免前端列表不同步时反复报错
+        const msg = String(error?.message || '');
+        if (msg.includes('邮箱不存在')) {
+            return { success: true, deleted: false };
+        }
+        throw error;
+    }
 }
 
 // ============================================
