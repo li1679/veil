@@ -904,7 +904,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
         bindParams.push(limit, offset);
         
         const { results } = await db.prepare(`
-          SELECT m.id, m.address, m.created_at, COALESCE(um.is_pinned, 0) AS is_pinned,
+          SELECT m.id, m.address, m.created_at, COALESCE(m.remark, '') AS remark, COALESCE(um.is_pinned, 0) AS is_pinned,
                  CASE WHEN (m.password_hash IS NULL OR m.password_hash = '') THEN 1 ELSE 0 END AS password_is_default,
                  COALESCE(m.can_login, 0) AS can_login
           FROM mailboxes m
@@ -918,6 +918,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
           id: r.id || 0,
           address: r.address,
           created_at: r.created_at,
+          remark: r.remark || '',
           is_pinned: r.is_pinned,
           password_is_default: r.password_is_default,
           can_login: r.can_login,
@@ -967,7 +968,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       bindParams.push(limit, offset);
       
       const { results } = await db.prepare(`
-        SELECT m.id, m.address, m.created_at, um.is_pinned,
+        SELECT m.id, m.address, m.created_at, COALESCE(m.remark, '') AS remark, um.is_pinned,
                CASE WHEN (m.password_hash IS NULL OR m.password_hash = '') THEN 1 ELSE 0 END AS password_is_default,
                COALESCE(m.can_login, 0) AS can_login,
                (SELECT COUNT(1) FROM messages WHERE mailbox_id = m.id) AS email_count
@@ -993,6 +994,32 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       await db.prepare('UPDATE mailboxes SET password_hash = NULL WHERE address = ?').bind(address).run();
       return Response.json({ success: true });
     }catch(e){ return new Response('重置失败', { status: 500 }); }
+  }
+
+  // 更新邮箱备注 —— 仅严格管理员
+  if (path === '/api/mailboxes/remark' && request.method === 'POST') {
+    if (isMock) return new Response('演示模式不可操作', { status: 403 });
+    if (!isStrictAdmin()) return new Response('Forbidden', { status: 403 });
+    try {
+      const body = await request.json();
+      const address = String(body.address || '').trim().toLowerCase();
+      const remark = String(body.remark ?? '').trim();
+
+      if (!address) return new Response('缺少 address 参数', { status: 400 });
+      if (remark.length > 200) return new Response('备注最多200字', { status: 400 });
+
+      const mbRes = await db.prepare('SELECT id FROM mailboxes WHERE address = ?').bind(address).all();
+      if (!mbRes.results || mbRes.results.length === 0) {
+        return new Response('邮箱不存在', { status: 404 });
+      }
+
+      await db.prepare('UPDATE mailboxes SET remark = ? WHERE address = ?')
+        .bind(remark ? remark : null, address).run();
+
+      return Response.json({ success: true, remark });
+    } catch (e) {
+      return new Response('操作失败: ' + e.message, { status: 500 });
+    }
   }
 
   // 切换邮箱置顶状态

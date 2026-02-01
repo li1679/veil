@@ -105,6 +105,18 @@ function applyUserManagementAccessUI() {
 // ============================================
 // 视图切换
 // ============================================
+function closeMobileSidebarIfOpen() {
+    try {
+        if (window.matchMedia && !window.matchMedia('(max-width: 768px)').matches) return;
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('show');
+    } catch (_) {
+        // ignore
+    }
+}
+
 window.switchView = function(viewName, navEl) {
     // 更新导航状态
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -121,6 +133,9 @@ window.switchView = function(viewName, navEl) {
     } else if (viewName === 'all-emails') {
         loadAllMailboxes();
     }
+
+    // 移动端：切换后自动收起侧边栏，避免遮罩挡住操作
+    closeMobileSidebarIfOpen();
 };
 
 // ============================================
@@ -1114,6 +1129,10 @@ function renderAllMailboxes() {
         const pwdClass = isDefaultPwd ? '' : 'custom';
         const pwdColor = isDefaultPwd ? 'var(--label-secondary)' : 'var(--accent-blue)';
         const safeAddress = String(item.address || '').replace(/'/g, "\\'");
+        const remarkRaw = String(item.remark || '').trim();
+        const remarkHtml = remarkRaw
+            ? escapeHtml(remarkRaw)
+            : '<span class="remark-placeholder">添加备注</span>';
 
         return `
             <div class="e-row" id="email-row-${item.id}" style="${isSelected ? 'background: #F2F8FF;' : ''}">
@@ -1123,6 +1142,10 @@ function renderAllMailboxes() {
                 <div class="col-email">
                     <i class="ph ph-envelope-simple" style="color: #999;"></i>
                     <span>${item.address}</span>
+                </div>
+                <div class="col-remark" onclick="openRemarkModal(${item.id}, '${safeAddress}')">
+                    <i class="ph-bold ph-note-pencil" style="font-size: 14px; opacity: 0.75;"></i>
+                    <span class="remark-text">${remarkHtml}</span>
                 </div>
                 <div class="col-pass" onclick="openPwdModal(${item.id}, '${item.address}')">
                     <div class="pass-dot ${pwdClass}"></div>
@@ -1450,6 +1473,40 @@ window.savePassword = async function() {
         }
         loadAllMailboxes();
         closePwdModal();
+    } catch (error) {
+        showToast(error.message || '保存失败');
+    }
+};
+
+// 备注编辑
+let currentRemarkEditId = null;
+
+window.openRemarkModal = function(id, address) {
+    currentRemarkEditId = id;
+    document.getElementById('remarkEditEmail').textContent = address;
+    const mailbox = allMailboxes.find(m => m.id === id);
+    document.getElementById('remarkInput').value = mailbox?.remark || '';
+    openModal('remarkModal');
+};
+
+window.closeRemarkModal = function() {
+    closeModal('remarkModal');
+    currentRemarkEditId = null;
+};
+
+window.saveRemark = async function() {
+    if (!currentRemarkEditId) return;
+    const input = document.getElementById('remarkInput');
+    const remark = (input?.value || '').trim();
+    const mailbox = allMailboxes.find(m => m.id === currentRemarkEditId);
+
+    try {
+        const res = await adminMailboxAPI.update(currentRemarkEditId, { remark });
+        const nextRemark = (res && typeof res.remark === 'string') ? res.remark : remark;
+        if (mailbox) mailbox.remark = nextRemark;
+        renderAllMailboxes();
+        showToast('备注已保存');
+        closeRemarkModal();
     } catch (error) {
         showToast(error.message || '保存失败');
     }

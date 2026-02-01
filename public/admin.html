@@ -14,10 +14,10 @@
     </style>
 </head>
 <body class="app-mode">
-    <!-- 移动端侧边栏遮罩 -->
-    <div class="sidebar-overlay"></div>
-
     <div id="app-view" style="opacity: 1; transform: none; filter: none; pointer-events: auto;">
+        <!-- 移动端侧边栏遮罩（放在 #app-view 内，保证层级低于 sidebar 但高于主内容） -->
+        <div class="sidebar-overlay"></div>
+
         <div class="app-window">
             <!-- 侧边栏 -->
             <aside class="sidebar">
@@ -221,16 +221,17 @@
 
                     <div class="email-table-container">
                         <div class="email-card">
-                            <div class="e-header">
-                                <div style="display: flex; justify-content: center;">
-                                    <div class="custom-checkbox" id="selectAllEmailsCheckbox" onclick="toggleSelectAllEmails()"></div>
-                                </div>
-                                <div>邮箱地址</div>
-                                <div>登录密码</div>
-                                <div>登录状态</div>
-                                <div>创建时间</div>
-                                <div style="text-align: right;">操作</div>
-                            </div>
+                             <div class="e-header">
+                                 <div style="display: flex; justify-content: center;">
+                                     <div class="custom-checkbox" id="selectAllEmailsCheckbox" onclick="toggleSelectAllEmails()"></div>
+                                 </div>
+                                 <div>邮箱地址</div>
+                                 <div>备注</div>
+                                 <div>登录密码</div>
+                                 <div>登录状态</div>
+                                 <div>创建时间</div>
+                                 <div style="text-align: right;">操作</div>
+                             </div>
                             <div id="emailListBody">
                                 <div style="padding: 40px; text-align: center; color: #999;">加载中...</div>
                             </div>
@@ -417,6 +418,24 @@
             <div class="modal-footer">
                 <button class="btn btn-ghost" onclick="closePwdModal()">取消</button>
                 <button class="btn btn-primary" onclick="savePassword()">保存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 备注编辑模态框 -->
+    <div class="modal-overlay" id="remarkModal">
+        <div class="modal-card" style="width: 440px;">
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">编辑备注</h3>
+            <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
+                当前邮箱：<span id="remarkEditEmail" style="color: var(--accent-blue); font-weight: 500;"></span>
+            </p>
+
+            <label style="font-size: 13px; font-weight: 600; color: #333;">备注</label>
+            <textarea class="form-input" id="remarkInput" placeholder="最多200字，可留空清空" style="height: 110px; resize: none;"></textarea>
+
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeRemarkModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveRemark()">保存</button>
             </div>
         </div>
     </div>

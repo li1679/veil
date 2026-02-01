@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS mailboxes (
   address TEXT NOT NULL UNIQUE,
   local_part TEXT NOT NULL,
   domain TEXT NOT NULL,
+  remark TEXT,
   password_hash TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   last_accessed_at TEXT,

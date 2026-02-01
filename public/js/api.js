@@ -140,8 +140,10 @@ function mapAdminMailbox(item) {
     const isLoginAllowed = typeof item.is_login_allowed !== 'undefined'
         ? Boolean(item.is_login_allowed)
         : Boolean(item.can_login);
+    const remark = (typeof item.remark === 'string') ? item.remark : (item.remark == null ? '' : String(item.remark));
     return {
         ...item,
+        remark,
         password_changed: passwordChanged,
         is_login_allowed: isLoginAllowed,
     };
@@ -490,6 +492,13 @@ export const adminMailboxAPI = {
     async update(id, data) {
         const address = data && data.address ? data.address : adminMailboxCache.get(normalizeId(id));
         if (!address) throw new Error('邮箱不存在');
+
+        if (data && Object.prototype.hasOwnProperty.call(data, 'remark')) {
+            return request('/api/mailboxes/remark', {
+                method: 'POST',
+                body: JSON.stringify({ address, remark: data.remark }),
+            });
+        }
 
         if (data && Object.prototype.hasOwnProperty.call(data, 'is_login_allowed')) {
             return request('/api/mailboxes/toggle-login', {
