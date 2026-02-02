@@ -206,7 +206,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
   }
 
   function generateHumanNamePrefix(targetLength = 12) {
-    // 人名模式：只生成 a-z + 可选后缀数字，且长度严格等于 targetLength
+    // 人名模式（英文）：只生成 a-z + 可选后缀数字，且长度严格等于 targetLength
     const length = Math.max(4, Math.min(32, Math.floor(Number(targetLength) || 12)));
 
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -232,24 +232,40 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       'coleman', 'jenkins', 'perry', 'powell', 'long', 'patterson', 'nguyen', 'flores', 'torres', 'ramirez'
     ];
 
-    // pinyin（更贴近中文“人名”的观感，但仍为纯字母）
-    const pinyinSurnames = [
-      'li', 'wang', 'zhang', 'liu', 'chen', 'yang', 'huang', 'zhao', 'wu', 'zhou', 'xu', 'sun', 'hu', 'he',
-      'gao', 'lin', 'luo', 'guo', 'ma', 'zhu', 'qin', 'xie', 'jiang', 'song', 'tang', 'feng', 'yu', 'dong'
-    ];
-    const pinyinGiven = [
-      'wei', 'ming', 'jun', 'lei', 'fang', 'xin', 'yu', 'hao', 'yi', 'jing', 'nan', 'wen', 'peng', 'ting',
-      'yan', 'qi', 'lu', 'xuan', 'rui', 'han', 'bin', 'kai', 'jie', 'hong', 'hui', 'jia', 'bo', 'cheng',
-      'yue', 'shuo', 'zhen', 'yuan', 'xiao', 'dong', 'lin', 'ke', 'yuhan', 'jiayi', 'xiaoming', 'haoran'
-    ];
+    const firstNames = englishFirst.map(toAlpha).filter(Boolean);
+    const lastNames = englishLast.map(toAlpha).filter(Boolean);
 
-    const maxDigits = Math.max(0, Math.min(4, length - 4)); // 至少保留 4 位字母，保证“人名感”
-    let digitsCount = 0;
-    if (maxDigits > 0) {
-      const r = Math.random();
-      if (r < 0.28) digitsCount = Math.min(2, maxDigits);
-      else if (r < 0.33) digitsCount = Math.min(3, maxDigits);
+    function buildLengthMap(list = []) {
+      const map = new Map();
+      for (const name of list) {
+        const len = name.length;
+        if (!map.has(len)) map.set(len, []);
+        map.get(len).push(name);
+      }
+      return map;
     }
+
+    const firstByLen = buildLengthMap(firstNames);
+    const lastByLen = buildLengthMap(lastNames);
+    const firstLens = Array.from(firstByLen.keys());
+    const lastLens = Array.from(lastByLen.keys());
+
+    function pickByLen(map, len) {
+      const arr = map.get(len);
+      if (!arr || arr.length === 0) return null;
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function chooseDigitsCount(totalLen) {
+      const maxDigits = Math.max(0, Math.min(4, totalLen - 4)); // 至少保留 4 位字母
+      if (maxDigits <= 0) return 0;
+      const r = Math.random();
+      if (r < 0.62) return 0;
+      if (r < 0.9) return Math.min(2, maxDigits);
+      return Math.min(3, maxDigits);
+    }
+
+    const digitsCount = chooseDigitsCount(length);
 
     const alphaLen = length - digitsCount;
 
@@ -261,31 +277,64 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     }
 
     function buildAlpha(exactLen) {
-      for (let attempt = 0; attempt < 120; attempt++) {
-        const style = Math.random() < 0.6 ? 'en' : 'py';
-        const tokens = [];
-        if (style === 'en') {
-          tokens.push(pick(englishFirst), pick(englishLast));
-          if (Math.random() < 0.18) tokens.splice(1, 0, toAlpha(pick(englishFirst)).slice(0, 1)); // 中间名首字母
-        } else {
-          tokens.push(pick(pinyinSurnames), pick(pinyinGiven));
-          if (Math.random() < 0.35) tokens.push(pick(pinyinGiven)); // 双名（更接近“真实姓名”）
-        }
-
-        let base = tokens.map(toAlpha).filter(Boolean).join('');
-        if (base.length < 2) continue;
-
-        // 如果不够长，继续补充（姓/名/中间名），直到可截断到目标长度
-        while (base.length < exactLen) {
-          if (style === 'en') base += toAlpha(pick(englishLast));
-          else base += toAlpha(pick(pinyinGiven));
-        }
-
-        base = base.slice(0, exactLen);
-        if (base.length === exactLen && /^[a-z]+$/.test(base)) return base;
+      if (exactLen <= 6) {
+        const hit = pickByLen(firstByLen, exactLen) || pickByLen(lastByLen, exactLen);
+        if (hit) return hit;
       }
 
-      // 兜底：确保长度正确且为字母
+      for (let attempt = 0; attempt < 160; attempt++) {
+        const mode = Math.random();
+
+        // 1) first + last
+        if (mode < 0.58) {
+          const fl = pick(firstLens);
+          const ll = exactLen - fl;
+          if (ll < 3) continue;
+          const first = pickByLen(firstByLen, fl);
+          const last = pickByLen(lastByLen, ll);
+          if (first && last) return first + last;
+          continue;
+        }
+
+        // 2) first + middleInitial + last
+        if (mode < 0.78) {
+          const fl = pick(firstLens);
+          const ll = exactLen - fl - 1;
+          if (ll < 3) continue;
+          const first = pickByLen(firstByLen, fl);
+          const last = pickByLen(lastByLen, ll);
+          if (!first || !last) continue;
+          const mi = (pick(firstNames) || 'a').slice(0, 1);
+          return first + mi + last;
+        }
+
+        // 3) firstInitial + last
+        if (mode < 0.9) {
+          const ll = exactLen - 1;
+          const last = pickByLen(lastByLen, ll);
+          if (!last) continue;
+          const fi = (pick(firstNames) || 'a').slice(0, 1);
+          return fi + last;
+        }
+
+        // 4) first + last + last （双姓/复姓效果）
+        const fl = pick(firstLens);
+        const remain = exactLen - fl;
+        if (remain < 6) continue;
+        const ll1 = pick(lastLens.filter((l) => l >= 3 && l <= remain - 3));
+        if (!ll1) continue;
+        const ll2 = remain - ll1;
+        const first = pickByLen(firstByLen, fl);
+        const last1 = pickByLen(lastByLen, ll1);
+        const last2 = pickByLen(lastByLen, ll2);
+        if (first && last1 && last2) return first + last1 + last2;
+      }
+
+      // 兜底：不引入符号，只截断到固定长度
+      let base = (pick(firstNames) || 'alex') + (pick(lastNames) || 'smith');
+      while (base.length < exactLen) base += (pick(lastNames) || 'lee');
+      base = base.slice(0, exactLen);
+      if (/^[a-z]+$/.test(base)) return base;
       const letters = 'abcdefghijklmnopqrstuvwxyz';
       let out = '';
       for (let i = 0; i < exactLen; i++) out += letters.charAt(Math.floor(Math.random() * letters.length));
