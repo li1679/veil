@@ -205,9 +205,14 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
     return out;
   }
 
-  function generateHumanNamePrefix(maxLength = 12) {
-    const max = Math.max(4, Math.min(32, Number(maxLength) || 12));
-    const firstNames = [
+  function generateHumanNamePrefix(targetLength = 12) {
+    // 人名模式：只生成 a-z + 可选后缀数字，且长度严格等于 targetLength
+    const length = Math.max(4, Math.min(32, Math.floor(Number(targetLength) || 12)));
+
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const toAlpha = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+
+    const englishFirst = [
       'liam', 'noah', 'oliver', 'elijah', 'james', 'william', 'benjamin', 'lucas', 'henry', 'theodore',
       'jack', 'levi', 'alex', 'mason', 'michael', 'ethan', 'daniel', 'jacob', 'logan', 'sam',
       'sebastian', 'jackson', 'aiden', 'owen', 'wyatt', 'john', 'david', 'joseph', 'carter', 'luke',
@@ -216,7 +221,7 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       'abigail', 'emily', 'ella', 'aria', 'scarlett', 'grace', 'chloe', 'lily', 'zoey', 'nora',
       'hazel', 'riley', 'violet', 'stella', 'hannah', 'audrey', 'alice', 'lucy', 'claire', 'julia'
     ];
-    const lastNames = [
+    const englishLast = [
       'smith', 'johnson', 'williams', 'brown', 'jones', 'miller', 'davis', 'wilson', 'anderson', 'thomas',
       'taylor', 'moore', 'jackson', 'martin', 'lee', 'thompson', 'white', 'harris', 'clark', 'lewis',
       'robinson', 'walker', 'young', 'allen', 'king', 'wright', 'scott', 'hill', 'green', 'adams',
@@ -227,36 +232,68 @@ export async function handleApiRequest(request, db, mailDomains, options = { moc
       'coleman', 'jenkins', 'perry', 'powell', 'long', 'patterson', 'nguyen', 'flores', 'torres', 'ramirez'
     ];
 
-    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-    const sep = Math.random() < 0.75 ? '.' : '_';
+    // pinyin（更贴近中文“人名”的观感，但仍为纯字母）
+    const pinyinSurnames = [
+      'li', 'wang', 'zhang', 'liu', 'chen', 'yang', 'huang', 'zhao', 'wu', 'zhou', 'xu', 'sun', 'hu', 'he',
+      'gao', 'lin', 'luo', 'guo', 'ma', 'zhu', 'qin', 'xie', 'jiang', 'song', 'tang', 'feng', 'yu', 'dong'
+    ];
+    const pinyinGiven = [
+      'wei', 'ming', 'jun', 'lei', 'fang', 'xin', 'yu', 'hao', 'yi', 'jing', 'nan', 'wen', 'peng', 'ting',
+      'yan', 'qi', 'lu', 'xuan', 'rui', 'han', 'bin', 'kai', 'jie', 'hong', 'hui', 'jia', 'bo', 'cheng',
+      'yue', 'shuo', 'zhen', 'yuan', 'xiao', 'dong', 'lin', 'ke', 'yuhan', 'jiayi', 'xiaoming', 'haoran'
+    ];
 
-    const first = String(pick(firstNames));
-    const last = String(pick(lastNames));
-
-    const candidates = [
-      `${first}${sep}${last}`,
-      `${first}${sep}${last.slice(0, 1)}`,
-      `${first.slice(0, 1)}${sep}${last}`,
-      `${first}${last}`,
-      `${first.slice(0, 1)}${last}`,
-      `${first.slice(0, 3)}${sep}${last.slice(0, 3)}`,
-      `${first.slice(0, 4)}${last.slice(0, 4)}`,
-    ].map((s) => s.replace(/[^a-z0-9._-]/g, ''));
-
-    let base = candidates.find((s) => s.length >= 4 && s.length <= max);
-    if (!base) {
-      // 兜底：截断或随机
-      base = candidates[0] || generateRandomId(Math.min(12, max));
-      base = base.slice(0, max).replace(/^[._-]+|[._-]+$/g, '');
-      if (base.length < 4) base = generateRandomId(max);
+    const maxDigits = Math.max(0, Math.min(4, length - 4)); // 至少保留 4 位字母，保证“人名感”
+    let digitsCount = 0;
+    if (maxDigits > 0) {
+      const r = Math.random();
+      if (r < 0.28) digitsCount = Math.min(2, maxDigits);
+      else if (r < 0.33) digitsCount = Math.min(3, maxDigits);
     }
 
-    // 降低碰撞：按需加 2 位数字
-    if (base.length + 2 <= max && Math.random() < 0.35) {
-      base += String(Math.floor(Math.random() * 90) + 10);
+    const alphaLen = length - digitsCount;
+
+    function randomDigits(count) {
+      if (count <= 0) return '';
+      const min = count === 1 ? 0 : Math.pow(10, count - 1);
+      const max = Math.pow(10, count) - 1;
+      return String(Math.floor(min + Math.random() * (max - min + 1))).padStart(count, '0');
     }
 
-    return base;
+    function buildAlpha(exactLen) {
+      for (let attempt = 0; attempt < 120; attempt++) {
+        const style = Math.random() < 0.6 ? 'en' : 'py';
+        const tokens = [];
+        if (style === 'en') {
+          tokens.push(pick(englishFirst), pick(englishLast));
+          if (Math.random() < 0.18) tokens.splice(1, 0, toAlpha(pick(englishFirst)).slice(0, 1)); // 中间名首字母
+        } else {
+          tokens.push(pick(pinyinSurnames), pick(pinyinGiven));
+          if (Math.random() < 0.35) tokens.push(pick(pinyinGiven)); // 双名（更接近“真实姓名”）
+        }
+
+        let base = tokens.map(toAlpha).filter(Boolean).join('');
+        if (base.length < 2) continue;
+
+        // 如果不够长，继续补充（姓/名/中间名），直到可截断到目标长度
+        while (base.length < exactLen) {
+          if (style === 'en') base += toAlpha(pick(englishLast));
+          else base += toAlpha(pick(pinyinGiven));
+        }
+
+        base = base.slice(0, exactLen);
+        if (base.length === exactLen && /^[a-z]+$/.test(base)) return base;
+      }
+
+      // 兜底：确保长度正确且为字母
+      const letters = 'abcdefghijklmnopqrstuvwxyz';
+      let out = '';
+      for (let i = 0; i < exactLen; i++) out += letters.charAt(Math.floor(Math.random() * letters.length));
+      return out;
+    }
+
+    const alpha = buildAlpha(alphaLen);
+    return alpha + randomDigits(digitsCount);
   }
   function formatD1Timestamp(date){
     // D1 CURRENT_TIMESTAMP uses "YYYY-MM-DD HH:MM:SS" for string comparisons.
