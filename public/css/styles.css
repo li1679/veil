@@ -834,6 +834,8 @@ input[type=range]::-webkit-slider-thumb {
     background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(5px);
     z-index: 2000; opacity: 0; visibility: hidden; transition: opacity 0.3s;
     display: flex; align-items: center; justify-content: center;
+    overflow-y: auto; overscroll-behavior: contain;
+    padding: 12px;
 }
 .modal-overlay.active { opacity: 1; visibility: visible; }
 
@@ -866,6 +868,16 @@ input[type=range]::-webkit-slider-thumb {
 .mail-detail-time { font-size: 12px; color: var(--label-tertiary); }
 .mail-detail-body { padding: 20px; font-size: 14px; line-height: 1.7; color: var(--label-primary); background: #FFFFFF; }
 .mail-detail-body pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+.mail-detail-modal { height: auto; max-height: 80vh; }
+.mail-detail-modal .mail-detail-header { flex-shrink: 0; }
+.mail-detail-modal .mail-detail-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
 
 /* --- 邮箱收件箱查看器 --- */
 .mailbox-viewer-modal { width: 780px; max-height: 85vh; }
@@ -1039,6 +1051,8 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 @media (max-width: 768px) {
+    .modal-overlay { padding: 0; }
+
     .app-window {
         width: 100%; height: 100%; border-radius: 0;
     }
@@ -1065,6 +1079,22 @@ input[type=range]::-webkit-slider-thumb {
         width: 40px; height: 40px; border: none; background: none;
         display: flex; align-items: center; justify-content: center;
         font-size: 24px; color: var(--label-primary); cursor: pointer;
+    }
+    .mobile-header-action {
+        width: 40px; height: 40px; border: none; background: none;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px; color: var(--label-primary); cursor: pointer;
+    }
+
+    /* 移动端仅保留底部导航，侧边栏隐藏 */
+    .sidebar {
+        display: none;
+    }
+    .sidebar-overlay {
+        display: none !important;
+    }
+    .menu-toggle {
+        display: none;
     }
 
     .mobile-tab-bar { display: flex; }

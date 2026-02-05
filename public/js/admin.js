@@ -29,6 +29,10 @@ let viewerMailbox = null;
 let viewerEmails = [];
 let allMailboxesLoadController = null;
 let allMailboxesLoadSeq = 0;
+const HISTORY_FETCH_LIMIT = 50;
+const HISTORY_MAX_PAGES = 200;
+const ALL_MAILBOX_FETCH_LIMIT = 50;
+const ALL_MAILBOX_MAX_PAGES = 200;
 
 function getLastMailboxStorageKey() {
     const username = currentUser?.username ? String(currentUser.username) : 'unknown';
@@ -360,16 +364,15 @@ function setCurrentEmail(email) {
 // ============================================
 async function loadHistory() {
     try {
-        // 拉全量历史（后端默认 limit=10；这里分页拉取，保证“重新进入还是退出前的样子”）
-        const limit = 50;
-        let offset = 0;
+        // 拉全量历史（分页拉取，避免“删一条后不补位”）
         let mailboxes = [];
-        while (mailboxes.length < 500) {
-            const response = await mailboxAPI.getMailboxes({ scope: 'own', limit, offset });
+        for (let page = 0; page < HISTORY_MAX_PAGES; page += 1) {
+            const offset = page * HISTORY_FETCH_LIMIT;
+            const response = await mailboxAPI.getMailboxes({ scope: 'own', limit: HISTORY_FETCH_LIMIT, offset });
             const batch = (response.mailboxes || []);
+            if (batch.length === 0) break;
             mailboxes = mailboxes.concat(batch);
-            if (batch.length < limit) break;
-            offset += limit;
+            if (batch.length < HISTORY_FETCH_LIMIT) break;
         }
 
         emailHistory = mailboxes.map(m => ({
@@ -1260,18 +1263,31 @@ async function loadAllMailboxes() {
         const userFilter = document.getElementById('userFilter')?.value || '';
         const search = document.getElementById('emailSearchInput')?.value || '';
 
-        const response = await adminMailboxAPI.getAllMailboxes(
-            {
-                domain: domainFilter,
-                created_by: userFilter,
-                search: search
-            },
-            { signal: allMailboxesLoadController.signal }
-        );
+        let merged = [];
+        for (let page = 1; page <= ALL_MAILBOX_MAX_PAGES; page += 1) {
+            const response = await adminMailboxAPI.getAllMailboxes(
+                {
+                    domain: domainFilter,
+                    created_by: userFilter,
+                    search: search,
+                    limit: ALL_MAILBOX_FETCH_LIMIT,
+                    page,
+                    appendCache: page > 1,
+                },
+                { signal: allMailboxesLoadController.signal }
+            );
+
+            if (requestSeq !== allMailboxesLoadSeq) return;
+
+            const batch = response.mailboxes || [];
+            if (batch.length === 0) break;
+            merged = merged.concat(batch);
+            if (batch.length < ALL_MAILBOX_FETCH_LIMIT) break;
+        }
 
         if (requestSeq !== allMailboxesLoadSeq) return;
 
-        allMailboxes = response.mailboxes || [];
+        allMailboxes = merged;
         renderAllMailboxes();
 
         // 填充域名筛选下拉框

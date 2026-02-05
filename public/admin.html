@@ -66,8 +66,8 @@
             <main class="main-content">
                 <!-- 移动端头部 -->
                 <div class="mobile-header" style="display: none;">
-                    <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.add('open'); document.querySelector('.sidebar-overlay').classList.add('show');">
-                        <i class="ph ph-list"></i>
+                    <button class="mobile-header-action" type="button" onclick="document.getElementById('logoutMenuItem')?.click()" aria-label="退出登录">
+                        <i class="ph ph-sign-out"></i>
                     </button>
                     <div class="brand" style="margin: 0;">
                         <div class="brand-icon" style="width: 28px; height: 28px;">
@@ -75,7 +75,9 @@
                         </div>
                         <div class="brand-text" style="font-size: 17px;">Veil</div>
                     </div>
-                    <div style="width: 40px;"></div>
+                    <button class="mobile-header-action" type="button" onclick="document.getElementById('themeToggleItem')?.click()" aria-label="切换暗黑模式">
+                        <i class="ph ph-moon"></i>
+                    </button>
                 </div>
 
                 <!-- 视图1: 生成邮箱 -->
@@ -301,7 +303,7 @@
 
     <!-- 邮件详情模态框 -->
     <div class="modal-overlay" id="mailDetailModal">
-        <div class="sheet-modal" style="height: auto; max-height: 80vh;">
+        <div class="sheet-modal mail-detail-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeMailDetail()">关闭</button>
                 <div style="font-weight:600; font-size:16px;">邮件详情</div>

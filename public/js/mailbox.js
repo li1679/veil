@@ -7,7 +7,7 @@ import { mailboxUserAPI } from './api.js';
 import { requireMailboxUser, logout, canSend } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, initCommon,
-    formatTime, extractCode, escapeHtml
+    formatTime, extractCode, escapeHtml, sanitizeEmailHtml
 } from './common.js';
 
 // ============================================
@@ -195,7 +195,8 @@ window.openMailDetail = async function(id) {
         document.getElementById('mailDetailFrom').textContent = email.from_name || email.from_address;
         document.getElementById('mailDetailTo').textContent = email.to_address;
         document.getElementById('mailDetailTime').textContent = formatTime(email.received_at);
-        document.getElementById('mailDetailBody').innerHTML = email.html || `<pre>${escapeHtml(email.text || '')}</pre>`;
+        const safeHtml = sanitizeEmailHtml(email.html);
+        document.getElementById('mailDetailBody').innerHTML = safeHtml || `<pre>${escapeHtml(email.text || '')}</pre>`;
 
         openModal('mailDetailModal');
     } catch (error) {

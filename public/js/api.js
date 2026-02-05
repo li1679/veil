@@ -473,7 +473,8 @@ export const userAPI = {
 // ============================================
 export const adminMailboxAPI = {
     // 获取所有邮箱列表
-    async getAllMailboxes(params = {}) {
+    async getAllMailboxes(params = {}, requestOptions = {}) {
+        const appendCache = Boolean(params.appendCache);
         const queryParams = new URLSearchParams();
         if (params.domain) queryParams.set('domain', params.domain);
         if (params.search) queryParams.set('q', params.search);
@@ -481,14 +482,25 @@ export const adminMailboxAPI = {
 
         const limit = params.limit ? Number(params.limit) : null;
         const page = params.page ? Number(params.page) : null;
+        const rawOffset = Number(params.offset);
+        const hasOffset = Number.isFinite(rawOffset) && rawOffset >= 0;
+        const offset = hasOffset ? rawOffset : null;
+
         if (limit) queryParams.set('limit', String(limit));
-        if (page && limit) queryParams.set('offset', String((page - 1) * limit));
+        if (hasOffset) {
+            queryParams.set('offset', String(offset));
+        } else if (page && limit) {
+            queryParams.set('offset', String((page - 1) * limit));
+        }
 
         const queryString = queryParams.toString();
-        const response = await request(`/api/mailboxes${queryString ? '?' + queryString : ''}`);
+        const response = await request(`/api/mailboxes${queryString ? '?' + queryString : ''}`, requestOptions);
         const mailboxes = normalizeMailboxResponse(response).mailboxes.map(mapAdminMailbox);
 
-        adminMailboxCache.clear();
+        const shouldResetCache = !appendCache && !(hasOffset && offset > 0) && !(page && page > 1);
+        if (shouldResetCache) {
+            adminMailboxCache.clear();
+        }
         mailboxes.forEach((item) => {
             if (item && typeof item.id !== 'undefined') {
                 adminMailboxCache.set(normalizeId(item.id), item.address);

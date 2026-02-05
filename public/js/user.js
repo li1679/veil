@@ -35,6 +35,8 @@ let selectedExpiry = '24h';
 // 轮询
 let inboxPollInterval = null;
 const POLL_INTERVAL = 5000;
+const LIST_FETCH_LIMIT = 50;
+const MAX_LIST_FETCH_PAGES = 200;
 
 // ============================================
 // 初始化
@@ -271,16 +273,15 @@ function setCurrentEmail(email) {
 // ============================================
 async function loadHistory() {
     try {
-        // 拉全量历史（后端默认 limit=10；这里分页拉取）
-        const limit = 50;
-        let offset = 0;
+        // 拉全量历史（分页拉取，避免“删一条后不补位”）
         let mailboxes = [];
-        while (mailboxes.length < 500) {
-            const response = await mailboxAPI.getMailboxes({ limit, offset });
+        for (let page = 0; page < MAX_LIST_FETCH_PAGES; page += 1) {
+            const offset = page * LIST_FETCH_LIMIT;
+            const response = await mailboxAPI.getMailboxes({ limit: LIST_FETCH_LIMIT, offset });
             const batch = (response.mailboxes || []);
+            if (batch.length === 0) break;
             mailboxes = mailboxes.concat(batch);
-            if (batch.length < limit) break;
-            offset += limit;
+            if (batch.length < LIST_FETCH_LIMIT) break;
         }
 
         emailHistory = mailboxes.map(m => ({
