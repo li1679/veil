@@ -97,7 +97,7 @@ RESEND_API_KEY='{"domain1.com":"re_key1","domain2.com":"re_key2"}'
 
 完整接口说明请查看：[`docs/api.md`](docs/api.md)
 
-## API 调用（请求头写全，AI 也能直接用）
+## API 调用
 
 Base URL：`https://你的域名`
 
