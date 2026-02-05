@@ -8,7 +8,7 @@ import { requireUser, logout, canSend } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, openIOSAlert,
     animateDelete, initCommon, formatTime, extractCode, escapeHtml, sanitizeEmailHtml,
-    getStorage, setStorage, removeStorage
+    fitMailHtmlToViewport, getStorage, setStorage, removeStorage
 } from './common.js';
 
 // ============================================
@@ -580,9 +580,15 @@ window.openMailDetail = async function(id) {
         document.getElementById('mailDetailTo').textContent = email.to_address;
         document.getElementById('mailDetailTime').textContent = formatTime(email.received_at);
         const safeHtml = sanitizeEmailHtml(email.html);
-        document.getElementById('mailDetailBody').innerHTML = safeHtml || `<pre>${escapeHtml(email.text || '')}</pre>`;
+        const detailBody = document.getElementById('mailDetailBody');
+        if (detailBody) {
+            detailBody.innerHTML = safeHtml
+                ? `<div class="mail-html-fit"><div class="mail-html-sanitized">${safeHtml}</div></div>`
+                : `<pre>${escapeHtml(email.text || '')}</pre>`;
+        }
 
         openModal('mailDetailModal');
+        requestAnimationFrame(() => fitMailHtmlToViewport('mailDetailBody'));
     } catch (error) {
         showToast(error.message || '加载失败');
     }

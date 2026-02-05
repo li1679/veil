@@ -345,9 +345,10 @@ function sanitizeUrl(rawValue, attrName) {
     return value;
 }
 
-export function sanitizeEmailHtml(inputHtml) {
+export function sanitizeEmailHtml(inputHtml, options = {}) {
     const raw = String(inputHtml ?? '');
     if (!raw) return '';
+    const stripStyles = Boolean(options && options.stripStyles);
 
     if (typeof DOMParser === 'undefined') {
         return escapeHtml(raw);
@@ -386,6 +387,10 @@ export function sanitizeEmailHtml(inputHtml) {
                 }
 
                 if (name === 'style') {
+                    if (stripStyles) {
+                        el.removeAttribute(attr.name);
+                        continue;
+                    }
                     const lower = value.toLowerCase();
                     if (lower.includes('expression') || lower.includes('javascript:') || lower.includes('vbscript:')) {
                         el.removeAttribute(attr.name);
@@ -416,6 +421,52 @@ export function sanitizeEmailHtml(inputHtml) {
     } catch (_) {
         return escapeHtml(raw);
     }
+}
+
+export function fitMailHtmlToViewport(target = 'mailDetailBody') {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    if (!window.matchMedia('(max-width: 768px)').matches) return;
+
+    const container = typeof target === 'string'
+        ? document.getElementById(target)
+        : target;
+    if (!(container instanceof HTMLElement)) return;
+
+    const fitRoot = container.querySelector('.mail-html-fit');
+    const content = fitRoot?.querySelector('.mail-html-sanitized');
+    if (!(fitRoot instanceof HTMLElement) || !(content instanceof HTMLElement)) return;
+
+    const applyFit = () => {
+        content.style.transform = '';
+        content.style.transformOrigin = '';
+        content.style.width = '';
+        content.style.maxWidth = '';
+        fitRoot.style.height = '';
+
+        const viewportWidth = fitRoot.clientWidth;
+        const naturalWidth = Math.max(content.scrollWidth, content.offsetWidth);
+        if (!viewportWidth || !naturalWidth || naturalWidth <= viewportWidth) {
+            content.style.maxWidth = '100%';
+            return;
+        }
+
+        const scale = viewportWidth / naturalWidth;
+        const naturalHeight = Math.max(content.scrollHeight, content.offsetHeight);
+        content.style.width = `${naturalWidth}px`;
+        content.style.transformOrigin = 'top left';
+        content.style.transform = `scale(${scale})`;
+        fitRoot.style.height = `${Math.ceil(naturalHeight * scale)}px`;
+    };
+
+    applyFit();
+
+    const images = content.querySelectorAll('img');
+    images.forEach((img) => {
+        if (!(img instanceof HTMLImageElement)) return;
+        if (img.complete) return;
+        img.addEventListener('load', applyFit, { once: true });
+        img.addEventListener('error', applyFit, { once: true });
+    });
 }
 
 function parseDateInput(dateString) {
