@@ -270,6 +270,29 @@ function initMobileSidebar() {
     if (overlay) {
         overlay.addEventListener('click', closeSidebar);
     }
+
+    // 移动端左滑打开侧边栏
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if (window.innerWidth > 768) return;
+
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+
+        if (touchStartX <= 20 && (touchEndX - touchStartX) > 50 && Math.abs(touchEndY - touchStartY) < 50) {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            if (sidebar) sidebar.classList.add('open');
+            if (overlay) overlay.classList.add('show');
+        }
+    }, { passive: true });
 }
 
 // ============================================
