@@ -2320,7 +2320,19 @@ export async function handleEmailReceive(request, db, env) {
 
     const mailbox = extractEmail(to);
     const sender = extractEmail(from);
-    const mailboxId = await getOrCreateMailboxId(db, mailbox);
+    const mailboxId = await getMailboxIdByAddress(db, mailbox);
+    if (!mailboxId) {
+      return new Response('邮箱不存在', { status: 400 });
+    }
+    // 与 Email Routing 路径一致：过期邮箱拒收
+    const activeRes = await db.prepare(
+      'SELECT 1 FROM mailboxes WHERE id = ? AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1'
+    ).bind(mailboxId).all();
+    if (!activeRes?.results?.length) {
+      return new Response('邮箱已过期', { status: 400 });
+    }
+    db.prepare('UPDATE mailboxes SET last_accessed_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .bind(mailboxId).run().catch(() => {});
 
     // 构造简易 EML 并写入 R2（即便没有原始 raw 也生成便于详情查看）
     const now = new Date();

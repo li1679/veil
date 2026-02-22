@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Veil - 登录</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://unpkg.com">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="manifest" href="/manifest.json">
@@ -17,44 +17,44 @@
     <canvas id="aurora-canvas"></canvas>
 
     <div class="scene" id="loginScene" style="opacity: 0; transition: opacity 0.3s ease;">
-        <div id="loginCard" class="card-3d w-full max-w-[360px] p-10 rounded-[40px] flex flex-col items-center">
+        <div id="loginCard" class="card-3d" style="width:100%; max-width:360px; padding:40px; border-radius:40px; display:flex; flex-direction:column; align-items:center;">
 
-            <div class="flex flex-col items-center mb-8 layer-3">
-                <div class="w-[84px] h-[84px] logo-container rounded-[24px] flex items-center justify-center mb-5">
-                    <i class="ph ph-envelope-simple text-[40px] login-logo-icon" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"></i>
+            <div class="layer-3" style="display:flex; flex-direction:column; align-items:center; margin-bottom:32px;">
+                <div class="logo-container" style="width:84px; height:84px; border-radius:24px; display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
+                    <i class="ph ph-envelope-simple login-logo-icon" style="font-size:40px; display:flex; align-items:center; justify-content:center; width:100%; height:100%;"></i>
                 </div>
-                <h1 class="text-2xl font-semibold tracking-tight login-title">Veil</h1>
-                <p class="text-sm mt-1 login-subtitle">临时邮箱服务</p>
+                <h1 class="login-title" style="font-size:24px; font-weight:600; letter-spacing:-0.02em;">Veil</h1>
+                <p class="login-subtitle" style="font-size:14px; margin-top:4px;">临时邮箱服务</p>
             </div>
 
-            <form id="loginForm" class="space-y-6 w-full layer-2">
-                <div class="group space-y-2">
-                    <div class="flex items-center gap-2 pl-1 login-field-label">
-                        <i class="ph ph-user text-base"></i>
-                        <span class="text-[14px] font-medium tracking-wide">用户名</span>
+            <form id="loginForm" class="layer-2" style="display:flex; flex-direction:column; gap:24px; width:100%;">
+                <div>
+                    <div class="login-field-label" style="display:flex; align-items:center; gap:8px; padding-left:4px; margin-bottom:8px;">
+                        <i class="ph ph-user" style="font-size:16px;"></i>
+                        <span style="font-size:14px; font-weight:500; letter-spacing:0.02em;">用户名</span>
                     </div>
                     <input type="text" id="loginUsername" placeholder="请输入用户名"
-                           class="apple-input w-full h-[50px] px-4 rounded-[16px] text-[15px] outline-none"
+                           class="apple-input" style="width:100%; height:50px; padding:0 16px; border-radius:16px; font-size:15px; outline:none;"
                            autocomplete="username" required>
                 </div>
 
-                <div class="group space-y-2">
-                    <div class="flex items-center gap-2 pl-1 login-field-label">
-                        <i class="ph ph-lock text-base"></i>
-                        <span class="text-[14px] font-medium tracking-wide">密码</span>
+                <div>
+                    <div class="login-field-label" style="display:flex; align-items:center; gap:8px; padding-left:4px; margin-bottom:8px;">
+                        <i class="ph ph-lock" style="font-size:16px;"></i>
+                        <span style="font-size:14px; font-weight:500; letter-spacing:0.02em;">密码</span>
                     </div>
                     <input type="password" id="loginPassword" placeholder="请输入密码"
-                           class="apple-input w-full h-[50px] px-4 rounded-[16px] text-[15px] outline-none"
+                           class="apple-input" style="width:100%; height:50px; padding:0 16px; border-radius:16px; font-size:15px; outline:none;"
                            autocomplete="current-password" required>
                 </div>
 
-                <div id="errorMsg" class="text-red-500 text-sm text-center hidden"></div>
+                <div id="errorMsg" class="error-text hidden"></div>
 
-                <div class="mt-8 w-full layer-3">
+                <div class="layer-3" style="margin-top:8px; width:100%;">
                     <button type="submit" id="loginBtn"
-                            class="apple-btn w-full h-[50px] text-white font-medium rounded-[16px] flex items-center justify-center gap-2 cursor-pointer">
+                            class="apple-btn" style="width:100%; height:50px; color:white; font-weight:500; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
                         <span>登录</span>
-                        <i class="ph ph-arrow-right text-base opacity-80"></i>
+                        <i class="ph ph-arrow-right" style="font-size:16px; opacity:0.8;"></i>
                     </button>
                 </div>
             </form>
@@ -67,7 +67,7 @@
     </div>
 
     <script type="module">
-        import { startAurora, initCard3D } from '/js/aurora.js';
+        import { startAurora, stopAurora, initCard3D } from '/js/aurora.js';
         import { login, checkSession, getRedirectUrl } from '/js/auth.js';
         import { showToast } from '/js/common.js';
         import { initTheme } from '/js/theme.js';
@@ -124,6 +124,7 @@
 
             if (result.success) {
                 showToast('登录成功');
+                stopAurora();
                 // 跳转到对应页面
                 setTimeout(() => {
                     window.location.href = getRedirectUrl(result.user);
@@ -131,7 +132,7 @@
             } else {
                 showError(result.error);
                 loginBtn.disabled = false;
-                loginBtn.innerHTML = '<span>登录</span><i class="ph ph-arrow-right text-base opacity-80"></i>';
+                loginBtn.innerHTML = '<span>登录</span><i class="ph ph-arrow-right" style="font-size:16px; opacity:0.8;"></i>';
             }
         });
 

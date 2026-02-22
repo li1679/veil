@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Veil - 临时邮箱</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://unpkg.com">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="/css/styles.css">
     <style>
@@ -80,7 +81,7 @@
                                 <div style="font-size:14px; font-weight:500;">随机域名后缀</div>
                                 <div class="muted-caption">开启后每次生成都会随机选择域名</div>
                             </div>
-                            <div class="ios-switch" id="randomDomainSwitch" role="button" tabindex="0" aria-label="切换随机域名后缀" onclick="toggleRandomDomain()">
+                            <div class="ios-switch" id="randomDomainSwitch" role="switch" aria-checked="false" tabindex="0" aria-label="切换随机域名后缀" onclick="toggleRandomDomain()">
                                 <div class="ios-switch-thumb"></div>
                             </div>
                         </div>
@@ -151,11 +152,11 @@
     <div class="toast" id="toast"><i class="ph-bold ph-check"></i> <span id="toastMsg">成功</span></div>
 
     <!-- 发送邮件模态框 -->
-    <div class="modal-overlay" id="sendModalOverlay">
+    <div class="modal-overlay" id="sendModalOverlay" aria-labelledby="userSendModalTitle">
         <div class="sheet-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeSendModal()">取消</button>
-                <div style="font-weight:600; font-size:16px;">新邮件</div>
+                <div id="userSendModalTitle" style="font-weight:600; font-size:16px;">新邮件</div>
                 <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发送</button>
             </div>
             <div class="sheet-body">
@@ -177,11 +178,11 @@
     </div>
 
     <!-- 邮件详情模态框 -->
-    <div class="modal-overlay" id="mailDetailModal">
+    <div class="modal-overlay" id="mailDetailModal" aria-labelledby="userMailDetailTitle">
         <div class="sheet-modal mail-detail-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeMailDetail()">关闭</button>
-                <div style="font-weight:600; font-size:16px;">邮件详情</div>
+                <div id="userMailDetailTitle" style="font-weight:600; font-size:16px;">邮件详情</div>
                 <div style="width: 50px;"></div>
             </div>
             <div class="mail-detail-header">

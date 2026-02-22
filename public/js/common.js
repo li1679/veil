@@ -12,6 +12,12 @@ export function showToast(msg) {
     const toast = document.getElementById('toast');
     if (!toast) return;
 
+    // 可访问性：确保 toast 能被屏幕阅读器感知
+    if (!toast.hasAttribute('aria-live')) {
+        toast.setAttribute('aria-live', 'polite');
+        toast.setAttribute('role', 'status');
+    }
+
     const msgEl = document.getElementById('toastMsg');
     if (msgEl) msgEl.textContent = msg;
 

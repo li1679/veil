@@ -62,6 +62,7 @@
     --r-card: 16px;
     --r-sm: 8px;
     --r-md: 12px;
+    --r-pill: 20px;
 
     /* 缓动函数 */
     --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
@@ -149,7 +150,6 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Inter", sans-serif;
-    overflow: hidden;
     -webkit-font-smoothing: antialiased;
     background-color: var(--ios-bg);
     transition: background-color 0.8s var(--ease-out);
@@ -160,6 +160,7 @@ body.has-open-modal {
 
 body.app-mode {
     background-color: var(--ios-bg);
+    overflow: hidden;
 }
 
 /* --- 工具类 --- */
@@ -511,7 +512,7 @@ body.app-mode #app-view {
 
 /* --- 按钮样式 --- */
 .btn {
-    height: 40px; padding: 0 18px; border-radius: 20px; border: none;
+    height: 40px; padding: 0 18px; border-radius: var(--r-pill); border: none;
     font-size: 15px; font-weight: 500; cursor: pointer;
     display: flex; align-items: center; gap: 6px;
     transition: all 0.2s var(--ease-out);
@@ -527,12 +528,20 @@ body.app-mode #app-view {
 .btn-secondary:hover { background: var(--surface-control-hover); }
 .btn-danger { background: rgba(255, 59, 48, 0.1); color: var(--system-red); }
 .btn-danger:hover { background: rgba(255, 59, 48, 0.15); }
+/* .btn-ghost is an alias for .btn-secondary */
 .btn-ghost {
     background: var(--surface-control);
     color: var(--label-primary);
     box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--stroke-soft);
 }
 .btn-ghost:hover { background: var(--surface-control-hover); }
+
+/* --- 焦点环（可访问性） --- */
+button:focus-visible,
+.btn:focus-visible {
+    box-shadow: var(--focus-ring);
+    outline: none;
+}
 
 /* --- 仪表盘网格 --- */
 .dashboard-grid {
@@ -608,6 +617,7 @@ body.app-mode #app-view {
     background: var(--surface-control); border-radius: 7px; box-shadow: var(--shadow-knob);
     transition: transform 0.3s var(--ease-bounce); z-index: 0;
 }
+.segment-4 .segment-bg { width: calc(25% - 3px); }
 
 .custom-input {
     width: 100%; padding: 10px 12px; border: 1px solid var(--ios-separator-light); border-radius: var(--r-sm);
@@ -1046,14 +1056,12 @@ input[type=range]::-webkit-slider-thumb {
 }
 .mail-html-sanitized { color: inherit; }
 .mail-html-sanitized img { max-width: 100%; height: auto; }
-[data-theme='dark'] .mail-html-sanitized,
-[data-theme='dark'] .mail-html-sanitized * {
-    background-color: transparent !important;
-    color: #EDEDF0 !important;
-    border-color: var(--ios-separator) !important;
+[data-theme='dark'] .mail-html-sanitized {
+    background-color: var(--ios-card);
+    color: #EDEDF0;
 }
 [data-theme='dark'] .mail-html-sanitized a {
-    color: var(--accent-blue) !important;
+    color: var(--accent-blue);
 }
 .mail-detail-modal { height: auto; max-height: 80vh; }
 .mail-detail-modal .mail-detail-header { flex-shrink: 0; }
@@ -1454,5 +1462,41 @@ input[type=range]::-webkit-slider-thumb {
     .email-actions {
         opacity: 1;
         pointer-events: auto;
+    }
+}
+
+/* --- 操作栏 --- */
+.mailbox-actions {
+    padding: 20px 40px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+/* --- 邮箱地址溢出省略 --- */
+.mailbox-address {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* --- 错误文字 --- */
+.error-text {
+    color: var(--system-red);
+    font-size: 14px;
+    text-align: center;
+}
+
+/* --- prefers-reduced-motion --- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .segment-bg {
+        transition: none !important;
     }
 }
