@@ -10,6 +10,47 @@ function getMailboxTimeWindow(ctx) {
   return { timeFilter: ' AND received_at >= ?', timeParam: [twentyFourHoursAgo] };
 }
 
+function normalizeInlineCid(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^cid:/i, '')
+    .replace(/^<|>$/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function attachmentMatchesCid(attachment, targetCid) {
+  const attachmentCid = normalizeInlineCid(attachment?.contentId || '');
+  const normalizedTarget = normalizeInlineCid(targetCid);
+  if (!attachmentCid || !normalizedTarget) return false;
+  if (attachmentCid === normalizedTarget) return true;
+  const attachmentBare = attachmentCid.split('@')[0];
+  const targetBare = normalizedTarget.split('@')[0];
+  return Boolean(attachmentBare && targetBare && attachmentBare === targetBare);
+}
+
+function rewriteInlineCidUrls(html, emailId, attachments = []) {
+  const source = String(html || '');
+  if (!source || !emailId || !attachments.length) return source;
+  return source.replace(/(src\s*=\s*["'])cid:([^"']+)(["'])/ig, (_, prefix, cidValue, suffix) => {
+    const attachment = attachments.find((item) => attachmentMatchesCid(item, cidValue));
+    if (!attachment) return `${prefix}cid:${cidValue}${suffix}`;
+    const normalizedCid = normalizeInlineCid(attachment.contentId || cidValue);
+    return `${prefix}/api/email/${emailId}/inline/${encodeURIComponent(normalizedCid)}${suffix}`;
+  });
+}
+
+async function loadParsedEmailFromR2(ctx, objectKey) {
+  if (!objectKey || !ctx.r2) return null;
+  const obj = await ctx.r2.get(objectKey);
+  if (!obj) return null;
+  let raw = null;
+  if (typeof obj.arrayBuffer === 'function') raw = await obj.arrayBuffer();
+  else if (obj.body) raw = await new Response(obj.body).arrayBuffer();
+  if (!raw) return null;
+  return parseEmailMessage(raw);
+}
+
 export async function handleEmailApi(ctx) {
   const { db, isMock, path, request, url } = ctx;
 
@@ -137,6 +178,33 @@ export async function handleEmailApi(ctx) {
     }
   }
 
+  if (request.method === 'GET' && path.startsWith('/api/email/') && path.includes('/inline/')) {
+    if (isMock) return new Response('演示模式不可访问内嵌资源', { status: 403 });
+    const parts = path.split('/');
+    const emailId = parts[3];
+    const cid = decodeURIComponent(parts.slice(5).join('/'));
+    if (!emailId || !cid) return new Response('缺少参数', { status: 400 });
+    try {
+      const access = await ctx.ensureMessageAccess(emailId);
+      if (access) return access;
+      const { results } = await db.prepare('SELECT r2_object_key FROM messages WHERE id = ? LIMIT 1').bind(emailId).all();
+      const row = (results || [])[0];
+      if (!row?.r2_object_key) return new Response('未找到资源', { status: 404 });
+      const parsed = await loadParsedEmailFromR2(ctx, row.r2_object_key);
+      const attachment = (parsed?.inlineAttachments || []).find((item) => attachmentMatchesCid(item, cid));
+      if (!attachment?.bytes?.length) return new Response('未找到资源', { status: 404 });
+      const headers = new Headers({
+        'Content-Type': attachment.contentType || 'application/octet-stream',
+        'Cache-Control': 'private, max-age=300'
+      });
+      headers.set('Content-Disposition', 'inline');
+      return new Response(attachment.bytes, { headers });
+    } catch (error) {
+      console.error('加载内嵌资源失败:', error);
+      return new Response('加载资源失败', { status: 500 });
+    }
+  }
+
   if (request.method === 'GET' && path.startsWith('/api/email/')) {
     const emailId = path.split('/')[3];
     if (isMock) return Response.json(buildMockEmailDetail(emailId));
@@ -160,19 +228,13 @@ export async function handleEmailApi(ctx) {
       let resolvedSender = String(row.sender || '');
       let resolvedToAddrs = String(row.to_addrs || '');
       try {
-        if (row.r2_object_key && ctx.r2) {
-          const obj = await ctx.r2.get(row.r2_object_key);
-          if (obj) {
-            let raw = null;
-            if (typeof obj.arrayBuffer === 'function') raw = await obj.arrayBuffer();
-            else if (obj.body) raw = await new Response(obj.body).arrayBuffer();
-            const parsed = parseEmailMessage(raw);
-            content = parsed.text || '';
-            html_content = parsed.html || '';
-            resolvedSubject = parsed.subject || resolvedSubject;
-            resolvedSender = extractEmail(parsed.from || '') || resolvedSender;
-            resolvedToAddrs = String(parsed.to || resolvedToAddrs || '');
-          }
+        const parsed = await loadParsedEmailFromR2(ctx, row.r2_object_key);
+        if (parsed) {
+          content = parsed.text || '';
+          html_content = rewriteInlineCidUrls(parsed.html || '', emailId, parsed.inlineAttachments || []);
+          resolvedSubject = parsed.subject || resolvedSubject;
+          resolvedSender = extractEmail(parsed.from || '') || resolvedSender;
+          resolvedToAddrs = String(parsed.to || resolvedToAddrs || '');
         }
       } catch (_) {}
       if (!content && !html_content) {

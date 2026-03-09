@@ -13,10 +13,11 @@ export function parseEmailBody(raw) {
 export function parseEmailMessage(raw) {
   const source = normalizeRawEmailSource(raw);
   if (!source) {
-    return { headers: {}, subject: '', from: '', to: '', text: '', html: '' };
+    return { headers: {}, subject: '', from: '', to: '', text: '', html: '', inlineAttachments: [] };
   }
   const { headers, body } = splitHeadersAndBody(source);
-  const parsed = parseEntity(headers, body);
+  const inlineAttachments = [];
+  const parsed = parseEntity(headers, body, inlineAttachments);
   return {
     headers,
     subject: decodeMimeHeader(headers.subject || ''),
@@ -24,6 +25,7 @@ export function parseEmailMessage(raw) {
     to: decodeMimeHeader(headers.to || ''),
     text: parsed.text || '',
     html: parsed.html || '',
+    inlineAttachments,
   };
 }
 
@@ -33,7 +35,7 @@ export function parseEmailMessage(raw) {
  * @param {string} body - 邮件正文内容
  * @returns {object} 包含text和html属性的对象
  */
-function parseEntity(headers, body) {
+function parseEntity(headers, body, inlineAttachments = []) {
   // 注意：boundary 区分大小写，不能对 content-type 整体小写后再提取
   const ctRaw = headers['content-type'] || '';
   const ct = ctRaw.toLowerCase();
@@ -42,13 +44,30 @@ function parseEntity(headers, body) {
 
   // 单体：text/html 或 text/plain
   if (!ct.startsWith('multipart/')) {
+    const rawBytes = decodeTransferEncodingToBytes(body, transferEnc);
     const decoded = decodeBodyWithCharset(body, transferEnc, ct);
+    const guessedHtml = guessHtmlFromRaw(decoded || body || '');
     const isHtml = ct.includes('text/html');
-    const isText = ct.includes('text/plain') || !isHtml;
+    const isText = ct.includes('text/plain') || !ct;
+    const contentId = normalizeContentId(headers['content-id'] || '');
+    const disposition = getDispositionType(headers['content-disposition'] || '');
+    if (contentId && rawBytes.length > 0 && !isHtml && !isText) {
+      inlineAttachments.push({
+        contentId,
+        contentType: getMimeType(ctRaw),
+        disposition,
+        bytes: rawBytes,
+      });
+    }
+    if (isHtml) {
+      return { text: isText ? decoded : '', html: guessedHtml || decoded };
+    }
+    if (guessedHtml) {
+      return { text: isText ? decoded : '', html: guessedHtml };
+    }
     // 某些邮件不带 content-type 或是 message/rfc822 等，将其作为纯文本尝试
     if (!ct || ct === '') {
-      const guessHtml = guessHtmlFromRaw(decoded || body || '');
-      if (guessHtml) return { text: '', html: guessHtml };
+      if (guessedHtml) return { text: '', html: guessedHtml };
     }
     return { text: isText ? decoded : '', html: isHtml ? decoded : '' };
   }
@@ -66,7 +85,7 @@ function parseEntity(headers, body) {
       // 2) text/rfc822-headers（仅头部）后常跟随一个 text/html 或 text/plain 部分
       // 3) 某些服务会将原始邮件整体放在 text/plain/base64 中，里面再包含 HTML 片段
       if (pct.startsWith('multipart/')) {
-        const nested = parseEntity(ph, pb);
+        const nested = parseEntity(ph, pb, inlineAttachments);
         if (!html && nested.html) html = nested.html;
         if (!text && nested.text) text = nested.text;
       } else if (pct.startsWith('message/rfc822')) {
@@ -77,7 +96,7 @@ function parseEntity(headers, body) {
         // 跳过纯头部，尝试在后续 part 中抓取正文
         continue;
       } else {
-        const res = parseEntity(ph, pb);
+        const res = parseEntity(ph, pb, inlineAttachments);
         if (!html && res.html) html = res.html;
         if (!text && res.text) text = res.text;
       }
@@ -137,6 +156,25 @@ function parseHeaders(rawHeaders) {
     }
   }
   return headers;
+}
+
+function normalizeContentId(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^cid:/i, '')
+    .replace(/^<|>$/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function getDispositionType(contentDisposition) {
+  return String(contentDisposition || '').split(';')[0].trim().toLowerCase();
+}
+
+function getMimeType(contentType) {
+  const raw = String(contentType || '').trim();
+  if (!raw) return 'application/octet-stream';
+  return raw.split(';')[0].trim().toLowerCase() || 'application/octet-stream';
 }
 
 function normalizeRawEmailSource(raw) {
@@ -371,13 +409,23 @@ export function decodeMimeHeader(value) {
  */
 function guessHtmlFromRaw(raw) {
   if (!raw) return '';
-  const lower = raw.toLowerCase();
-  let hs = lower.indexOf('<html');
-  if (hs === -1) hs = lower.indexOf('<!doctype html');
-  if (hs !== -1) {
-    const he = lower.lastIndexOf('</html>');
-    if (he !== -1) return raw.slice(hs, he + 7);
+
+  const fullDocMatches = Array.from(
+    String(raw).matchAll(/(?:<!doctype\s+html[\s\S]*?<html[\s\S]*?<\/html>|<html[\s\S]*?<\/html>)/ig)
+  );
+  if (fullDocMatches.length > 0) {
+    return String(fullDocMatches[0][0] || '').trim();
   }
+
+  const bodyMatch = String(raw).match(/<body[\s\S]*?<\/body>/i);
+  if (bodyMatch && bodyMatch[0]) {
+    return `<!doctype html><html><head><meta charset="utf-8"></head>${bodyMatch[0]}</html>`;
+  }
+
+  if (/<[a-z][\s\S]*?>/i.test(String(raw)) && /<\/[a-z]+>/i.test(String(raw))) {
+    return `<!doctype html><html><head><meta charset="utf-8"></head><body>${String(raw)}</body></html>`;
+  }
+
   return '';
 }
 
