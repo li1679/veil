@@ -2,7 +2,7 @@
 // Fallback to escaping if HTMLRewriter unavailable.
 
 const BLOCKED_TAGS = [
-  'script', 'style', 'iframe', 'object', 'embed',
+  'script', 'iframe', 'object', 'embed',
   'link', 'meta', 'base', 'noscript', 'template',
   'form', 'input', 'button', 'textarea', 'select', 'option',
   'svg', 'math'

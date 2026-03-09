@@ -136,10 +136,10 @@ export function createApiContext(request, db, mailDomains, options = {}) {
     if (!resolvedAdminName || resolvedAdminName === '__root__') return 0;
     try {
       await db.prepare(
-        "INSERT OR IGNORE INTO users (username, password_hash, role, can_send, mailbox_limit) VALUES (?, NULL, 'admin', 1, 999999)"
-      ).bind(resolvedAdminName).run();
+        "INSERT OR IGNORE INTO users (username, name, password_hash, role, can_send, mailbox_limit, status) VALUES (?, ?, NULL, 'admin', 1, 999999, 'Active')"
+      ).bind(resolvedAdminName, resolvedAdminName).run();
       await db.prepare(
-        "UPDATE users SET role = 'admin', can_send = 1, mailbox_limit = 999999 WHERE username = ?"
+        "UPDATE users SET name = COALESCE(NULLIF(TRIM(name), ''), username), role = 'admin', can_send = 1, mailbox_limit = 999999, status = 'Active' WHERE username = ?"
       ).bind(resolvedAdminName).run();
       const { results } = await db.prepare('SELECT id FROM users WHERE username = ? LIMIT 1').bind(resolvedAdminName).all();
       uid = Number(results?.[0]?.id || 0);

@@ -5,7 +5,7 @@
 
 import {
     showToast, copyText, openModal, closeModal,
-    formatTime, extractCode, escapeHtml, sanitizeEmailHtml, fitMailHtmlToViewport
+    formatTime, extractCode, escapeHtml
 } from './common.js';
 
 const POLL_INTERVAL = 5000;
@@ -35,6 +35,47 @@ export function createInboxController(opts) {
 
     function getEmailVerificationCode(email) {
         return email?.verification_code || extractCode(`${email?.subject || ''} ${getEmailPreviewText(email)}`);
+    }
+
+    function buildMailDetailDocument(rawHtml) {
+        const html = String(rawHtml || '').trim();
+        if (!html) return '';
+        if (/<html[\s>]/i.test(html) || /<!doctype/i.test(html)) return html;
+        return `<!doctype html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+    }
+
+    function resizeMailFrame(frame) {
+        const doc = frame?.contentDocument;
+        if (!doc) return;
+        const root = doc.documentElement;
+        const body = doc.body;
+        const height = Math.max(root?.scrollHeight || 0, body?.scrollHeight || 0, 320);
+        frame.style.height = `${height}px`;
+    }
+
+    function renderMailDetailBody(detailBody, email) {
+        const rawHtml = String(email?.html || '').trim();
+        if (!rawHtml) {
+            detailBody.innerHTML = `<pre>${escapeHtml(email?.text || '')}</pre>`;
+            return;
+        }
+
+        const frame = document.createElement('iframe');
+        frame.className = 'mail-detail-frame';
+        frame.setAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox allow-same-origin');
+        frame.setAttribute('loading', 'lazy');
+        frame.setAttribute('referrerpolicy', 'no-referrer');
+        frame.style.width = '100%';
+        frame.style.minHeight = '320px';
+        frame.style.border = '0';
+        frame.style.background = 'transparent';
+        frame.srcdoc = buildMailDetailDocument(rawHtml);
+        frame.addEventListener('load', () => {
+            resizeMailFrame(frame);
+            setTimeout(() => resizeMailFrame(frame), 60);
+        });
+        detailBody.replaceChildren(frame);
+        requestAnimationFrame(() => resizeMailFrame(frame));
     }
 
     // === 渲染收件箱 ===
@@ -126,16 +167,12 @@ export function createInboxController(opts) {
             document.getElementById('mailDetailFrom').textContent = email.from_name || email.from_address;
             document.getElementById('mailDetailTo').textContent = email.to_address;
             document.getElementById('mailDetailTime').textContent = formatTime(email.received_at);
-            const safeHtml = sanitizeEmailHtml(email.html);
             const detailBody = document.getElementById('mailDetailBody');
             if (detailBody) {
-                detailBody.innerHTML = safeHtml
-                    ? `<div class="mail-html-fit"><div class="mail-html-sanitized">${safeHtml}</div></div>`
-                    : `<pre>${escapeHtml(email.text || '')}</pre>`;
+                renderMailDetailBody(detailBody, email);
             }
 
             openModal('mailDetailModal');
-            requestAnimationFrame(() => fitMailHtmlToViewport('mailDetailBody'));
         } catch (error) {
             showToast(error.message || '加载失败');
         }

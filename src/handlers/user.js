@@ -9,13 +9,22 @@ import {
   updateUser
 } from '../database.js';
 
+function normalizeUserStatus(status) {
+  return String(status || '').trim().toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
+}
+
+function normalizeDisplayName(name, username) {
+  const trimmed = String(name || '').trim();
+  return trimmed || String(username || '').trim().toLowerCase();
+}
+
 function ensureMockUsersState(domains) {
   if (globalThis.__MOCK_USERS__) return;
   const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
   globalThis.__MOCK_USERS__ = [
-    { id: 1, username: 'demo1', role: 'user', can_send: 0, mailbox_limit: 5, created_at: createdAt },
-    { id: 2, username: 'demo2', role: 'user', can_send: 0, mailbox_limit: 8, created_at: createdAt },
-    { id: 3, username: 'operator', role: 'user', can_send: 0, mailbox_limit: 20, created_at: createdAt }
+    { id: 1, username: 'demo1', name: 'demo1', role: 'user', can_send: 0, mailbox_limit: 5, status: 'Active', created_at: createdAt },
+    { id: 2, username: 'demo2', name: 'demo2', role: 'user', can_send: 0, mailbox_limit: 8, status: 'Active', created_at: createdAt },
+    { id: 3, username: 'operator', name: 'operator', role: 'user', can_send: 0, mailbox_limit: 20, status: 'Active', created_at: createdAt }
   ];
   globalThis.__MOCK_USER_MAILBOXES__ = new Map();
   try {
@@ -57,9 +66,11 @@ export async function handleUserApi(ctx, body) {
       const exists = (globalThis.__MOCK_USERS__ || []).some((user) => user.username === username);
       if (exists) return new Response('用户名已存在', { status: 400 });
       const mailbox_limit = Math.max(0, Number(payload.mailboxLimit || 10));
+      const name = normalizeDisplayName(payload.name, username);
+      const status = normalizeUserStatus(payload.status);
       const id = ++globalThis.__MOCK_USER_LAST_ID__;
       const item = {
-        id, username, role: 'user', can_send: 0, mailbox_limit,
+        id, username, name, role: 'user', can_send: payload.can_send ? 1 : 0, mailbox_limit, status,
         created_at: new Date().toISOString().replace('T', ' ').slice(0, 19)
       };
       globalThis.__MOCK_USERS__.unshift(item);
@@ -76,8 +87,16 @@ export async function handleUserApi(ctx, body) {
     if (index < 0) return new Response('未找到用户', { status: 404 });
     try {
       const payload = body ?? await ctx.readJsonBody();
+      if (typeof payload.username === 'string' && payload.username.trim()) {
+        const username = String(payload.username || '').trim().toLowerCase();
+        const taken = list.some((user, idx) => idx !== index && user.username === username);
+        if (taken) return new Response('用户名已存在', { status: 400 });
+        list[index].username = username;
+      }
+      if (typeof payload.name !== 'undefined') list[index].name = normalizeDisplayName(payload.name, list[index].username);
       if (typeof payload.mailboxLimit !== 'undefined') list[index].mailbox_limit = Math.max(0, Number(payload.mailboxLimit));
       if (typeof payload.can_send !== 'undefined') list[index].can_send = payload.can_send ? 1 : 0;
+      if (typeof payload.status !== 'undefined') list[index].status = normalizeUserStatus(payload.status);
       return Response.json({ success: true });
     } catch (_) {
       return new Response('更新失败', { status: 500 });
@@ -157,6 +176,8 @@ export async function handleUserApi(ctx, body) {
       if (!username) return new Response('用户名不能为空', { status: 400 });
       if (ctx.isSuperAdminName(username)) return new Response('该用户名为超级管理员保留', { status: 400 });
       const mailboxLimit = Number(payload.mailboxLimit || 10);
+      const name = normalizeDisplayName(payload.name, username);
+      const status = normalizeUserStatus(payload.status);
       const password = String(payload.password || '').trim();
       if (password.length > 128) return new Response('密码长度不能超过128位', { status: 400 });
       let passwordHash = null;
@@ -164,7 +185,14 @@ export async function handleUserApi(ctx, body) {
         const { hashPassword } = await import('../authentication.js');
         passwordHash = await hashPassword(password);
       }
-      return Response.json(await createUser(db, { username, passwordHash, role: 'user', mailboxLimit }));
+      const created = await createUser(db, { username, name, passwordHash, role: 'user', mailboxLimit, status });
+      if (payload.can_send) {
+        await updateUser(db, created.id, { can_send: 1 });
+      }
+      const refreshed = await db.prepare(
+        'SELECT id, username, name, role, can_send, mailbox_limit, status, created_at FROM users WHERE id = ? LIMIT 1'
+      ).bind(created.id).all();
+      return Response.json(refreshed?.results?.[0] || created);
     } catch (e) {
       const msg = String(e?.message || e);
       const lower = msg.toLowerCase();
@@ -183,8 +211,17 @@ export async function handleUserApi(ctx, body) {
       if (ctx.isSuperAdminName(target.results[0].username)) return new Response('Forbidden', { status: 403 });
       const payload = body ?? await ctx.readJsonBody();
       const fields = {};
+      if (typeof payload.username === 'string' && payload.username.trim()) {
+        const username = String(payload.username || '').trim().toLowerCase();
+        if (ctx.isSuperAdminName(username)) return new Response('该用户名为超级管理员保留', { status: 400 });
+        fields.username = username;
+      }
+      if (typeof payload.name !== 'undefined') {
+        fields.name = normalizeDisplayName(payload.name, fields.username || target.results[0].username);
+      }
       if (typeof payload.mailboxLimit !== 'undefined') fields.mailbox_limit = Math.max(0, Number(payload.mailboxLimit));
       if (typeof payload.can_send !== 'undefined') fields.can_send = payload.can_send ? 1 : 0;
+      if (typeof payload.status !== 'undefined') fields.status = normalizeUserStatus(payload.status);
       if (typeof payload.password === 'string' && payload.password) {
         if (payload.password.length > 128) return new Response('密码长度不能超过128位', { status: 400 });
         const { hashPassword } = await import('../authentication.js');
@@ -193,7 +230,10 @@ export async function handleUserApi(ctx, body) {
       await updateUser(db, id, fields);
       return Response.json({ success: true });
     } catch (e) {
-      return new Response('更新失败: ' + (e?.message || e), { status: 500 });
+      const msg = String(e?.message || e);
+      const lower = msg.toLowerCase();
+      if (lower.includes('unique') || lower.includes('constraint')) return new Response('用户名已存在', { status: 400 });
+      return new Response('更新失败: ' + msg, { status: 500 });
     }
   }
 

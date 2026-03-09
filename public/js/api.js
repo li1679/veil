@@ -355,6 +355,7 @@ export const userAPI = {
             const role = normalizeUserRole(user.role);
             const canSend = Boolean(user.can_send);
             const status = user.status || 'Active';
+            const name = (typeof user.name === 'string') ? user.name : '';
 
             let mailboxes = Array.isArray(user.mailboxes) ? user.mailboxes : null;
             if (!mailboxes) {
@@ -368,6 +369,7 @@ export const userAPI = {
                 ...user,
                 quota,
                 role,
+                name,
                 can_send: canSend,
                 status,
                 mailboxes,
@@ -387,22 +389,18 @@ export const userAPI = {
     // 创建用户
     async create(userData) {
         const payload = {
+            name: (typeof userData.name === 'string') ? userData.name.trim() : '',
             username: userData.username,
             password: userData.password,
             mailboxLimit: normalizeUserQuota(userData),
+            can_send: userData.can_send ? 1 : 0,
+            status: userData.status || 'Active',
         };
 
         const created = await request('/api/users', {
             method: 'POST',
             body: JSON.stringify(payload),
         });
-
-        if (userData.can_send) {
-            await request(`/api/users/${created.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ can_send: 1 }),
-            });
-        }
 
         if (userData.initial_mailbox && userData.initial_mailbox.prefix && userData.initial_mailbox.domain) {
             const address = `${userData.initial_mailbox.prefix}@${userData.initial_mailbox.domain}`;
@@ -421,8 +419,10 @@ export const userAPI = {
         if (typeof userData.quota !== 'undefined') payload.mailboxLimit = userData.quota;
         if (typeof userData.mailbox_limit !== 'undefined') payload.mailboxLimit = userData.mailbox_limit;
         if (typeof userData.can_send !== 'undefined') payload.can_send = userData.can_send ? 1 : 0;
+        if (typeof userData.status !== 'undefined') payload.status = userData.status;
         if (typeof userData.password !== 'undefined' && userData.password !== '') payload.password = userData.password;
         if (typeof userData.username !== 'undefined' && userData.username !== '') payload.username = userData.username;
+        if (typeof userData.name !== 'undefined') payload.name = String(userData.name || '').trim();
 
         return request(`/api/users/${id}`, {
             method: 'PATCH',

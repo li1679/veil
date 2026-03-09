@@ -210,6 +210,20 @@ export async function authMiddleware(context) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  if (payload.role === 'user' && Number(payload.userId || 0) > 0) {
+    try {
+      const db = await getDatabaseWithValidation(env);
+      const { results } = await db.prepare('SELECT status FROM users WHERE id = ? LIMIT 1').bind(Number(payload.userId)).all();
+      const status = String(results?.[0]?.status || 'Active');
+      if (status === 'Inactive') {
+        return new Response('账户已停用', { status: 403 });
+      }
+    } catch (error) {
+      console.error('Auth status check failed:', error);
+      return new Response('数据库连接失败', { status: 500 });
+    }
+  }
+
   context.authPayload = payload;
   return null;
 }
@@ -361,13 +375,13 @@ export function createRouter() {
         let adminUserId = 0;
         try {
           await DB.prepare(
-            "INSERT OR IGNORE INTO users (username, password_hash, role, can_send, mailbox_limit) VALUES (?, NULL, 'admin', 1, 999999)"
-          ).bind(ADMIN_NAME).run();
+            "INSERT OR IGNORE INTO users (username, name, password_hash, role, can_send, mailbox_limit, status) VALUES (?, ?, NULL, 'admin', 1, 999999, 'Active')"
+          ).bind(ADMIN_NAME, ADMIN_NAME).run();
           // 保底同步字段（避免之前存在同名用户但配额太小）
           await DB.prepare(
-            "UPDATE users SET role = 'admin', can_send = 1, mailbox_limit = 999999 WHERE username = ?"
+            "UPDATE users SET name = COALESCE(NULLIF(TRIM(name), ''), username), role = 'admin', can_send = 1, mailbox_limit = 999999, status = 'Active' WHERE username = ?"
           ).bind(ADMIN_NAME).run();
-          const { results: adminRows } = await DB.prepare('SELECT id FROM users WHERE username = ? LIMIT 1').bind(ADMIN_NAME).all();
+          const { results: adminRows } = await DB.prepare('SELECT id, name FROM users WHERE username = ? LIMIT 1').bind(ADMIN_NAME).all();
           adminUserId = Number(adminRows?.[0]?.id || 0);
         } catch (_) {
           adminUserId = 0;
@@ -381,18 +395,28 @@ export function createRouter() {
 
       // 2) 普通用户：查询 users 表校验用户名与密码
       try {
-        const { results } = await DB.prepare('SELECT id, password_hash, role, mailbox_limit, can_send FROM users WHERE username = ?').bind(name).all();
+        const { results } = await DB.prepare('SELECT id, name, password_hash, role, mailbox_limit, can_send, status FROM users WHERE username = ?').bind(name).all();
         if (results && results.length) {
           const row = results[0];
           const ok = await verifyPassword(password, row.password_hash || '');
           if (ok) {
+            if (String(row.status || 'Active') === 'Inactive') {
+              return new Response('账户已停用', { status: 403 });
+            }
             const role = 'user';
             const token = await createJwt(JWT_TOKEN, { role, username: name, userId: row.id });
             const headers = new Headers({ 'Content-Type': 'application/json' });
             headers.set('Set-Cookie', buildSessionCookie(token, request.url));
             const canSend = row.can_send ? 1 : 0;
             const mailboxLimit = row.mailbox_limit || 10;
-            return new Response(JSON.stringify({ success: true, role, can_send: canSend, mailbox_limit: mailboxLimit }), { headers });
+            return new Response(JSON.stringify({
+              success: true,
+              role,
+              name: row.name || row.username || name,
+              status: row.status || 'Active',
+              can_send: canSend,
+              mailbox_limit: mailboxLimit
+            }), { headers });
           }
         }
       } catch (_) {
@@ -468,6 +492,8 @@ export function createRouter() {
     }
 
     let userId = Number(authPayload.userId || 0);
+    let name = '';
+    let status = 'Active';
     let canSend = 0;
     let mailboxLimit = 0;
     let quotaUsed = 0;
@@ -476,30 +502,40 @@ export function createRouter() {
     try {
       const DB = await getDatabaseWithValidation(env);
 
-      if (role === 'admin') {
-        canSend = 1;
-        if (strictAdmin) {
-          mailboxLimit = 999999;
-          quotaUsed = await getTotalMailboxCount(DB);
-        } else if (userId) {
-          const { getCachedUserQuota } = await import('./cacheHelper.js');
-          const quota = await getCachedUserQuota(DB, userId);
-          mailboxLimit = quota.limit;
-          quotaUsed = quota.used;
+        if (role === 'admin') {
+          canSend = 1;
+          if (strictAdmin) {
+            mailboxLimit = 999999;
+            quotaUsed = await getTotalMailboxCount(DB);
+            if (userId) {
+              const { results } = await DB.prepare('SELECT name FROM users WHERE id = ? LIMIT 1').bind(userId).all();
+              name = String(results?.[0]?.name || username || '');
+            }
+          } else if (userId) {
+            const { getCachedUserQuota } = await import('./cacheHelper.js');
+            const quota = await getCachedUserQuota(DB, userId);
+            mailboxLimit = quota.limit;
+            quotaUsed = quota.used;
+          }
+        } else if (role === 'user') {
+          if (userId) {
+            const { getCachedUserQuota } = await import('./cacheHelper.js');
+            const quota = await getCachedUserQuota(DB, userId);
+            mailboxLimit = quota.limit;
+            quotaUsed = quota.used;
+            const info = await DB.prepare('SELECT name, can_send, status FROM users WHERE id = ? LIMIT 1').bind(userId).all();
+            const row = info?.results?.[0] || {};
+            canSend = row.can_send ? 1 : 0;
+            name = String(row.name || username || '');
+            status = String(row.status || 'Active');
+            if (status === 'Inactive') {
+              return new Response('账户已停用', { status: 403 });
+            }
+          }
+        } else if (role === 'mailbox') {
+          mailboxLimit = 1;
+          quotaUsed = 1;
         }
-      } else if (role === 'user') {
-        if (userId) {
-          const { getCachedUserQuota } = await import('./cacheHelper.js');
-          const quota = await getCachedUserQuota(DB, userId);
-          mailboxLimit = quota.limit;
-          quotaUsed = quota.used;
-          const info = await DB.prepare('SELECT can_send FROM users WHERE id = ? LIMIT 1').bind(userId).all();
-          canSend = info?.results?.[0]?.can_send ? 1 : 0;
-        }
-      } else if (role === 'mailbox') {
-        mailboxLimit = 1;
-        quotaUsed = 1;
-      }
     } catch (_) {
       // ignore and fallback to defaults
     }
@@ -508,6 +544,8 @@ export function createRouter() {
       authenticated: true,
       role,
       username,
+      name,
+      status,
       strictAdmin,
       user_id: userId,
       userId,

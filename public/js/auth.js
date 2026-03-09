@@ -45,7 +45,8 @@ export async function checkSession() {
             currentUser = {
                 id: response.user_id || response.userId,
                 username: response.username,
-                name: response.name,
+                name: response.name || response.username,
+                status: response.status || 'Active',
                 role,
                 canSend: Boolean(typeof response.can_send !== 'undefined' ? response.can_send : response.canSend),
                 quota: typeof response.quota !== 'undefined'

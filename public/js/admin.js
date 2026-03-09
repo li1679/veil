@@ -366,7 +366,7 @@ async function loadHistory() {
         // 如果有历史记录，选中第一个
         if (emailHistory.length > 0) {
             const preferred = lastEmail && emailHistory.some((h) => h.email === lastEmail) ? lastEmail : emailHistory[0].email;
-            restoreEmail(preferred);
+            window.restoreEmail(preferred);
         }
     } catch (error) {
         console.error('Failed to load history:', error);
@@ -1340,8 +1340,8 @@ window.closeMailboxViewer = function() {
 };
 
 window.openViewerMailDetail = async function(id) {
-    closeMailboxViewer();
-    await openMailDetail(id);
+    window.closeMailboxViewer();
+    await window.openMailDetail(id);
 };
 
 window.refreshMailboxViewer = function() {
@@ -1355,7 +1355,7 @@ window.copyViewerEmailCode = function(event, id) {
         event.stopPropagation();
     }
     const email = getViewerEmailById(id);
-    const code = getEmailVerificationCode(email);
+    const code = inbox.getEmailVerificationCode(email);
     if (!code) {
         showToast('无法复制');
         return;
@@ -1513,7 +1513,7 @@ window.batchToggleLoginEmails = async function(allow) {
         });
         renderAllMailboxes();
         showToast(allow ? `已允许 ${count} 个邮箱登录` : `已禁止 ${count} 个邮箱登录`);
-        cancelEmailSelection();
+        window.cancelEmailSelection();
     } catch (error) {
         showToast(error.message || '操作失败');
     }
@@ -1618,7 +1618,7 @@ window.savePassword = async function() {
             showToast('密码已修改');
         }
         loadAllMailboxes();
-        closePwdModal();
+        window.closePwdModal();
     } catch (error) {
         showToast(error.message || '保存失败');
     }
@@ -1652,7 +1652,7 @@ window.saveRemark = async function() {
         if (mailbox) mailbox.remark = nextRemark;
         renderAllMailboxes();
         showToast('备注已保存');
-        closeRemarkModal();
+        window.closeRemarkModal();
     } catch (error) {
         showToast(error.message || '保存失败');
     }
@@ -1680,7 +1680,7 @@ function initEventListeners() {
         let debounceTimer;
         searchInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => filterAllEmails(searchInput.value), 300);
+            debounceTimer = setTimeout(() => window.filterAllEmails(searchInput.value), 300);
         });
     }
 
@@ -1747,8 +1747,6 @@ function initEventListeners() {
                 window.toggleSelectUser(userId);
             } else if (action === 'toggle-send-permission' && Number.isFinite(userId)) {
                 window.toggleSendPermission(userId);
-            } else if (action === 'change-user-status' && Number.isFinite(userId)) {
-                window.changeUserStatus(userId, actionEl.value);
             } else if (action === 'open-edit-user' && Number.isFinite(userId)) {
                 window.openEditUser(userId);
             } else if (action === 'delete-user' && Number.isFinite(userId)) {

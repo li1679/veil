@@ -1,6 +1,6 @@
 import { extractEmail } from '../commonUtils.js';
 import { getMailboxIdByAddress } from '../database.js';
-import { parseEmailBody } from '../emailParser.js';
+import { parseEmailMessage } from '../emailParser.js';
 import { sanitizeEmailHtml } from '../htmlSanitizer.js';
 import { buildMockEmailDetail, buildMockEmails } from '../mockData.js';
 
@@ -156,17 +156,22 @@ export async function handleEmailApi(ctx) {
       const row = results[0];
       let content = '';
       let html_content = '';
+      let resolvedSubject = String(row.subject || '');
+      let resolvedSender = String(row.sender || '');
+      let resolvedToAddrs = String(row.to_addrs || '');
       try {
         if (row.r2_object_key && ctx.r2) {
           const obj = await ctx.r2.get(row.r2_object_key);
           if (obj) {
-            let raw = '';
-            if (typeof obj.text === 'function') raw = await obj.text();
-            else if (typeof obj.arrayBuffer === 'function') raw = await new Response(await obj.arrayBuffer()).text();
-            else raw = await new Response(obj.body).text();
-            const parsed = parseEmailBody(raw || '');
+            let raw = null;
+            if (typeof obj.arrayBuffer === 'function') raw = await obj.arrayBuffer();
+            else if (obj.body) raw = await new Response(obj.body).arrayBuffer();
+            const parsed = parseEmailMessage(raw);
             content = parsed.text || '';
             html_content = parsed.html || '';
+            resolvedSubject = parsed.subject || resolvedSubject;
+            resolvedSender = extractEmail(parsed.from || '') || resolvedSender;
+            resolvedToAddrs = String(parsed.to || resolvedToAddrs || '');
           }
         }
       } catch (_) {}
@@ -179,7 +184,15 @@ export async function handleEmailApi(ctx) {
         } catch (_) {}
       }
       html_content = await sanitizeEmailHtml(html_content);
-      return Response.json({ ...row, content, html_content, download: row.r2_object_key ? `/api/email/${emailId}/download` : '' });
+      return Response.json({
+        ...row,
+        subject: resolvedSubject,
+        sender: resolvedSender,
+        to_addrs: resolvedToAddrs,
+        content,
+        html_content,
+        download: row.r2_object_key ? `/api/email/${emailId}/download` : ''
+      });
     } catch (_) {
       const { results } = await db.prepare(`
         SELECT id, sender, subject, content, html_content, received_at, is_read

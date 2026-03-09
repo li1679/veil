@@ -2,7 +2,7 @@
 import { handleEmailReceive } from './apiHandlers.js';
 import { extractEmail } from './commonUtils.js';
 import { forwardByLocalPart } from './emailForwarder.js';
-import { parseEmailBody, extractVerificationCode } from './emailParser.js';
+import { parseEmailMessage, decodeMimeHeader, extractVerificationCode } from './emailParser.js';
 import { createRouter, authMiddleware, resolveAuthPayload } from './routes.js';
 import { createAssetManager } from './assetManager.js';
 import { getDatabaseWithValidation } from './dbConnectionHelper.js';
@@ -83,7 +83,7 @@ export default {
       const headers = message.headers;
       const toHeader = headers.get('to') || headers.get('To') || '';
       const fromHeader = headers.get('from') || headers.get('From') || '';
-      const subject = headers.get('subject') || headers.get('Subject') || '(无主题)';
+      let subject = decodeMimeHeader(headers.get('subject') || headers.get('Subject') || '(无主题)');
 
       let envelopeTo = '';
       try {
@@ -120,11 +120,10 @@ export default {
       try {
         const resp = new Response(message.raw);
         rawBuffer = await resp.arrayBuffer();
-        const rawText = await new Response(rawBuffer).text();
-        const parsed = parseEmailBody(rawText);
+        const parsed = parseEmailMessage(rawBuffer);
         textContent = parsed.text || '';
         htmlContent = parsed.html || '';
-        if (!textContent && !htmlContent) textContent = (rawText || '').slice(0, 100000);
+        if (parsed.subject) subject = parsed.subject;
       } catch (_) {
         textContent = '';
         htmlContent = '';

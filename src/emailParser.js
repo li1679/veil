@@ -4,9 +4,27 @@
  * @returns {object} 包含text和html属性的对象
  */
 export function parseEmailBody(raw) {
-  if (!raw) return { text: '', html: '' };
-  const { headers: topHeaders, body: topBody } = splitHeadersAndBody(raw);
+  const source = normalizeRawEmailSource(raw);
+  if (!source) return { text: '', html: '' };
+  const { headers: topHeaders, body: topBody } = splitHeadersAndBody(source);
   return parseEntity(topHeaders, topBody);
+}
+
+export function parseEmailMessage(raw) {
+  const source = normalizeRawEmailSource(raw);
+  if (!source) {
+    return { headers: {}, subject: '', from: '', to: '', text: '', html: '' };
+  }
+  const { headers, body } = splitHeadersAndBody(source);
+  const parsed = parseEntity(headers, body);
+  return {
+    headers,
+    subject: decodeMimeHeader(headers.subject || ''),
+    from: decodeMimeHeader(headers.from || ''),
+    to: decodeMimeHeader(headers.to || ''),
+    text: parsed.text || '',
+    html: parsed.html || '',
+  };
 }
 
 /**
@@ -121,6 +139,24 @@ function parseHeaders(rawHeaders) {
   return headers;
 }
 
+function normalizeRawEmailSource(raw) {
+  if (!raw) return '';
+  if (raw instanceof Uint8Array) return bytesToBinaryString(raw);
+  if (raw instanceof ArrayBuffer) return bytesToBinaryString(new Uint8Array(raw));
+  if (ArrayBuffer.isView(raw)) return bytesToBinaryString(new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength));
+  return String(raw);
+}
+
+function bytesToBinaryString(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length === 0) return '';
+  const chunkSize = 0x8000;
+  let out = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    out += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return out;
+}
+
 /**
  * 从Content-Type头部中提取boundary分隔符
  * @param {string} contentType - Content-Type头部值
@@ -205,21 +241,11 @@ function decodeTransferEncodingToBytes(body, transferEncoding) {
 function decodeBodyWithCharset(body, transferEncoding, contentType) {
   if (!body) return '';
   const m = /charset\s*=\s*"?([^";]+)/i.exec(contentType || '');
-  const charset = (m && m[1] ? m[1].trim().toLowerCase() : '') || 'utf-8';
+  const charset = (m && m[1] ? m[1].trim() : '') || 'utf-8';
 
   const rawBytes = decodeTransferEncodingToBytes(body, transferEncoding);
   if (rawBytes.length === 0) return '';
-
-  try {
-    return new TextDecoder(charset, { fatal: false }).decode(rawBytes);
-  } catch (_) {
-    // Charset not supported (e.g. gbk on some runtimes), fall back to UTF-8
-    try {
-      return new TextDecoder('utf-8', { fatal: false }).decode(rawBytes);
-    } catch (_) {
-      return body;
-    }
-  }
+  return decodeBytesWithCharset(rawBytes, charset);
 }
 
 /**
@@ -243,6 +269,99 @@ function decodeQuotedPrintableToBytes(input) {
     bytes.push(ch.charCodeAt(0) & 0xFF);
   }
   return new Uint8Array(bytes);
+}
+
+function decodeHeaderQToBytes(input) {
+  const s = String(input || '').replace(/_/g, ' ');
+  const bytes = [];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '=' && i + 2 < s.length) {
+      const hex = s.substring(i + 1, i + 3);
+      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
+        bytes.push(parseInt(hex, 16));
+        i += 2;
+        continue;
+      }
+    }
+    bytes.push(ch.charCodeAt(0) & 0xFF);
+  }
+  return new Uint8Array(bytes);
+}
+
+function normalizeCharset(charset) {
+  const normalized = String(charset || '').trim().toLowerCase();
+  if (!normalized) return 'utf-8';
+  const aliases = {
+    utf8: 'utf-8',
+    gbk: 'gb18030',
+    gb2312: 'gb18030',
+    'gb_2312': 'gb18030',
+    gb18030: 'gb18030',
+    'x-gbk': 'gb18030',
+    'x-gb2312': 'gb18030',
+    big5: 'big5',
+    'big-5': 'big5',
+    latin1: 'windows-1252',
+    'iso-8859-1': 'windows-1252',
+    'iso8859-1': 'windows-1252',
+  };
+  return aliases[normalized] || normalized;
+}
+
+function buildCharsetCandidates(preferredCharset) {
+  const preferred = normalizeCharset(preferredCharset);
+  const candidates = [preferred];
+  if (preferred !== 'utf-8') candidates.push('utf-8');
+  if (preferred !== 'gb18030') candidates.push('gb18030');
+  if (preferred !== 'big5') candidates.push('big5');
+  if (preferred !== 'windows-1252') candidates.push('windows-1252');
+  return Array.from(new Set(candidates));
+}
+
+function scoreDecodedText(text) {
+  const value = String(text || '');
+  const replacementCount = (value.match(/\uFFFD/g) || []).length;
+  const nullCount = (value.match(/\u0000/g) || []).length;
+  return replacementCount * 100 + nullCount * 10;
+}
+
+function decodeBytesWithCharset(rawBytes, charset) {
+  let bestText = '';
+  let bestScore = Number.POSITIVE_INFINITY;
+  const preferred = normalizeCharset(charset);
+  for (const candidate of buildCharsetCandidates(preferred)) {
+    try {
+      const decoded = new TextDecoder(candidate, { fatal: false }).decode(rawBytes);
+      const score = scoreDecodedText(decoded);
+      if (score < bestScore) {
+        bestScore = score;
+        bestText = decoded;
+      }
+      if (score === 0 && candidate === preferred) {
+        return decoded;
+      }
+    } catch (_) {
+      // ignore unsupported charset candidates
+    }
+  }
+  return bestText || bytesToBinaryString(rawBytes);
+}
+
+export function decodeMimeHeader(value) {
+  const input = String(value || '');
+  if (!input.includes('=?')) return input;
+  const compact = input.replace(/(\?=)\s+(=\?)/g, '$1$2');
+  return compact.replace(/=\?([^?]+)\?([bqBQ])\?([^?]*)\?=/g, (_, charset, encoding, encodedText) => {
+    try {
+      const rawBytes = String(encoding).toUpperCase() === 'B'
+        ? decodeTransferEncodingToBytes(encodedText, 'base64')
+        : decodeHeaderQToBytes(encodedText);
+      return decodeBytesWithCharset(rawBytes, charset);
+    } catch (_) {
+      return encodedText;
+    }
+  });
 }
 
 /**

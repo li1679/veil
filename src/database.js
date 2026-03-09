@@ -53,10 +53,12 @@ async function ensureSchema(db) {
   });
 
   await ensureColumns(db, 'users', {
+    name: 'TEXT',
     password_hash: 'TEXT',
     role: "TEXT NOT NULL DEFAULT 'user'",
     can_send: 'INTEGER NOT NULL DEFAULT 0',
     mailbox_limit: 'INTEGER NOT NULL DEFAULT 10',
+    status: "TEXT NOT NULL DEFAULT 'Active'",
     created_at: 'TEXT DEFAULT CURRENT_TIMESTAMP',
   });
 
@@ -129,7 +131,7 @@ async function performFirstTimeSetup(db) {
     // 创建表结构（仅在表不存在时）
     await db.exec("CREATE TABLE IF NOT EXISTS mailboxes (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT NOT NULL UNIQUE, local_part TEXT NOT NULL, domain TEXT NOT NULL, remark TEXT, password_hash TEXT, password_enc TEXT, created_by_user_id INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, last_accessed_at TEXT, expires_at TEXT, is_pinned INTEGER DEFAULT 0, can_login INTEGER DEFAULT 0);");
     await db.exec("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, mailbox_id INTEGER NOT NULL, sender TEXT NOT NULL, to_addrs TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL, verification_code TEXT, preview TEXT, r2_bucket TEXT NOT NULL DEFAULT 'mail-eml', r2_object_key TEXT NOT NULL DEFAULT '', received_at TEXT DEFAULT CURRENT_TIMESTAMP, is_read INTEGER DEFAULT 0, FOREIGN KEY(mailbox_id) REFERENCES mailboxes(id));");
-    await db.exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT, role TEXT NOT NULL DEFAULT 'user', can_send INTEGER NOT NULL DEFAULT 0, mailbox_limit INTEGER NOT NULL DEFAULT 10, created_at TEXT DEFAULT CURRENT_TIMESTAMP);");
+    await db.exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, name TEXT, password_hash TEXT, role TEXT NOT NULL DEFAULT 'user', can_send INTEGER NOT NULL DEFAULT 0, mailbox_limit INTEGER NOT NULL DEFAULT 10, status TEXT NOT NULL DEFAULT 'Active', created_at TEXT DEFAULT CURRENT_TIMESTAMP);");
     await db.exec("CREATE TABLE IF NOT EXISTS user_mailboxes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, mailbox_id INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, is_pinned INTEGER NOT NULL DEFAULT 0, UNIQUE(user_id, mailbox_id), FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY(mailbox_id) REFERENCES mailboxes(id) ON DELETE CASCADE);");
     await db.exec("CREATE TABLE IF NOT EXISTS sent_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, resend_id TEXT, from_name TEXT, from_addr TEXT NOT NULL, to_addrs TEXT NOT NULL, subject TEXT NOT NULL, html_content TEXT, text_content TEXT, status TEXT DEFAULT 'queued', scheduled_at TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);");
   }
@@ -229,10 +231,12 @@ export async function setupDatabase(db) {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
+      name TEXT,
       password_hash TEXT,
       role TEXT NOT NULL DEFAULT 'user',
       can_send INTEGER NOT NULL DEFAULT 0,
       mailbox_limit INTEGER NOT NULL DEFAULT 10,
+      status TEXT NOT NULL DEFAULT 'Active',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -588,10 +592,12 @@ async function ensureUsersTables(db){
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
+      name TEXT,
       password_hash TEXT,
       role TEXT NOT NULL DEFAULT 'user',
       can_send INTEGER NOT NULL DEFAULT 0,
       mailbox_limit INTEGER NOT NULL DEFAULT 10,
+      status TEXT NOT NULL DEFAULT 'Active',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -626,12 +632,23 @@ async function ensureUsersTables(db){
  * @returns {Promise<object>} 创建的用户信息对象
  * @throws {Error} 当用户名为空时抛出异常
  */
-export async function createUser(db, { username, passwordHash = null, role = 'user', mailboxLimit = 10 }){
+function normalizeUserStatus(status) {
+  return String(status || '').trim().toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
+}
+
+function normalizeUserName(name, username) {
+  const trimmed = String(name || '').trim();
+  return trimmed || String(username || '').trim().toLowerCase();
+}
+
+export async function createUser(db, { username, name = '', passwordHash = null, role = 'user', mailboxLimit = 10, status = 'Active' }){
   const uname = String(username || '').trim().toLowerCase();
   if (!uname) throw new Error('用户名不能为空');
-  const r = await db.prepare('INSERT INTO users (username, password_hash, role, mailbox_limit) VALUES (?, ?, ?, ?)')
-    .bind(uname, passwordHash, role, Math.max(0, Number(mailboxLimit || 10))).run();
-  const res = await db.prepare('SELECT id, username, role, mailbox_limit, created_at FROM users WHERE username = ? LIMIT 1')
+  const displayName = normalizeUserName(name, uname);
+  const normalizedStatus = normalizeUserStatus(status);
+  await db.prepare('INSERT INTO users (username, name, password_hash, role, can_send, mailbox_limit, status) VALUES (?, ?, ?, ?, 0, ?, ?)')
+    .bind(uname, displayName, passwordHash, role, Math.max(0, Number(mailboxLimit || 10)), normalizedStatus).run();
+  const res = await db.prepare('SELECT id, username, name, role, can_send, mailbox_limit, status, created_at FROM users WHERE username = ? LIMIT 1')
     .bind(uname).all();
   return res?.results?.[0];
 }
@@ -644,13 +661,24 @@ export async function createUser(db, { username, passwordHash = null, role = 'us
  * @returns {Promise<void>} 更新完成后无返回值
  */
 export async function updateUser(db, userId, fields){
-  const allowed = ['mailbox_limit', 'password_hash', 'can_send'];
+  const nextFields = { ...(fields || {}) };
+  if ('username' in nextFields) {
+    nextFields.username = String(nextFields.username || '').trim().toLowerCase();
+  }
+  if ('name' in nextFields) {
+    nextFields.name = String(nextFields.name || '').trim();
+  }
+  if ('status' in nextFields) {
+    nextFields.status = normalizeUserStatus(nextFields.status);
+  }
+
+  const allowed = ['username', 'name', 'mailbox_limit', 'password_hash', 'can_send', 'status'];
   const setClauses = [];
   const values = [];
   for (const key of allowed){
-    if (key in (fields || {})){
+    if (key in nextFields){
       setClauses.push(`${key} = ?`);
-      values.push(fields[key]);
+      values.push(nextFields[key]);
     }
   }
   if (!setClauses.length) return;
@@ -660,10 +688,10 @@ export async function updateUser(db, userId, fields){
   
   // 使相关缓存失效
   const { invalidateUserQuotaCache, invalidateSystemStatCache } = await import('./cacheHelper.js');
-  if ('mailbox_limit' in fields) {
+  if ('mailbox_limit' in nextFields) {
     invalidateUserQuotaCache(userId);
   }
-  if ('can_send' in fields) {
+  if ('can_send' in nextFields) {
     invalidateSystemStatCache(`user_can_send_${userId}`);
   }
 }
@@ -695,7 +723,7 @@ export async function listUsersWithCounts(db, { limit = 50, offset = 0, sort = '
   
   // 优化：先获取用户列表，再单独查询邮箱数量，避免子查询扫描全表
   const usersSql = `
-    SELECT u.id, u.username, u.role, u.mailbox_limit, u.can_send, u.created_at
+    SELECT u.id, u.username, u.name, u.role, u.mailbox_limit, u.can_send, u.status, u.created_at
     FROM users u
     ORDER BY datetime(u.created_at) ${orderDirection}
     LIMIT ? OFFSET ?
