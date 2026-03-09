@@ -16,12 +16,21 @@ function getDomains(ctx) {
     : (Array.isArray(ctx.mailDomains) ? ctx.mailDomains : [(ctx.mailDomains || 'temp.example.com')]);
 }
 
+function resolveExpiresAt(expiry) {
+  if (!expiry || expiry === 'permanent') return null;
+  const map = { '1h': 3600000, '24h': 86400000, '3d': 259200000 };
+  const ms = map[expiry];
+  if (!ms) return null;
+  return new Date(Date.now() + ms).toISOString().slice(0, 19).replace('T', ' ');
+}
+
 async function handleGenerate(ctx, body) {
   try {
     const payload = body ?? await ctx.readJsonBody();
     const domain = String(payload.domain || '').trim();
     const prefixMode = String(payload.prefix_mode || 'random').trim();
     const lengthParam = Number(payload.length || 12);
+    const expiresAt = resolveExpiresAt(payload.expiry);
     const domains = getDomains(ctx);
     const chosenDomain = domains.includes(domain) ? domain : domains[0];
     const prefix = prefixMode === 'name' ? generateHumanNamePrefix(lengthParam) : generateRandomId(lengthParam);
@@ -29,12 +38,12 @@ async function handleGenerate(ctx, body) {
     if (!ctx.isMock) {
       const userId = await ctx.resolveAdminUserId();
       if (userId) {
-        await assignMailboxToUser(ctx.db, { userId, address: email });
-        return Response.json({ address: email, expires: Date.now() + 3600000 });
+        await assignMailboxToUser(ctx.db, { userId, address: email, expiresAt });
+        return Response.json({ address: email });
       }
-      await getOrCreateMailboxId(ctx.db, email);
+      await getOrCreateMailboxId(ctx.db, email, { expiresAt });
     }
-    return Response.json({ address: email, expires: Date.now() + 3600000 });
+    return Response.json({ address: email });
   } catch (e) {
     return new Response(String(e?.message || '创建失败'), { status: 400 });
   }
@@ -63,6 +72,7 @@ async function handleCreate(ctx, body) {
     const payload = body ?? await ctx.readJsonBody();
     const local = String(payload.prefix || payload.local || '').trim().toLowerCase();
     if (!/^[a-z0-9._-]{1,64}$/i.test(local)) return new Response('非法用户名', { status: 400 });
+    const expiresAt = resolveExpiresAt(payload.expiry);
     const domains = getDomains(ctx);
     let chosenDomain;
     if (payload.domain && domains.includes(payload.domain)) chosenDomain = payload.domain;
@@ -80,11 +90,11 @@ async function handleCreate(ctx, body) {
         return new Response('邮箱地址已存在，使用其他地址', { status: 409 });
       }
       if (userId) {
-        await assignMailboxToUser(ctx.db, { userId, address: email });
-        return Response.json({ address: email, expires: Date.now() + 3600000 });
+        await assignMailboxToUser(ctx.db, { userId, address: email, expiresAt });
+        return Response.json({ address: email });
       }
-      await getOrCreateMailboxId(ctx.db, email);
-      return Response.json({ address: email, expires: Date.now() + 3600000 });
+      await getOrCreateMailboxId(ctx.db, email, { expiresAt });
+      return Response.json({ address: email });
     } catch (e) {
       if (String(e?.message || '').includes('已达到邮箱上限')) return new Response('已达到邮箱创建上限', { status: 429 });
       return new Response(String(e?.message || '创建失败'), { status: 400 });
