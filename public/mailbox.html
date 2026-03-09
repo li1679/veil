@@ -1,0 +1,141 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veil - 我的邮箱</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/icons/regular.css">
+    <link rel="stylesheet" href="/css/icons/bold.css">
+    <link rel="stylesheet" href="/css/icons/fill.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body {
+            background-color: var(--ios-bg);
+            overflow-y: auto;
+        }
+    </style>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#F2F2F7">
+    <meta name="color-scheme" content="light dark">
+    <script type="module" src="/js/theme.js"></script>
+</head>
+<body>
+    <div class="mailbox-layout">
+        <!-- 顶部栏 -->
+        <div class="mailbox-header">
+            <div class="user-brand">
+                <div class="brand-icon">
+                    <i class="ph ph-envelope-simple" style="font-size: 20px;"></i>
+                </div>
+                <div class="brand-text">Veil</div>
+            </div>
+
+            <div class="mailbox-address" id="mailboxAddress">加载中...</div>
+
+            <div style="display:flex; align-items:center; gap:12px;">
+                <a href="https://github.com/li1679/veil" class="github-pill" target="_blank" rel="noopener noreferrer">
+                    <i class="ph-fill ph-github-logo"></i>
+                    <span>GitHub</span>
+                </a>
+                <button class="btn btn-ghost" onclick="handleLogout()" style="height: 36px;">
+                    <i class="ph ph-sign-out"></i> 退出
+                </button>
+            </div>
+        </div>
+
+        <!-- 操作栏 -->
+        <div style="padding: 20px 40px; display: flex; gap: 12px; justify-content: center;">
+            <button class="btn btn-secondary" onclick="copyMailbox()">
+                <i class="ph-bold ph-copy"></i> 复制邮箱
+            </button>
+            <button class="btn btn-secondary" onclick="refreshInbox()">
+                <i class="ph-bold ph-arrows-clockwise"></i> 刷新收件箱
+            </button>
+            <button class="btn btn-primary" id="sendMailBtn" onclick="openSendModal()">
+                <i class="ph-bold ph-paper-plane-tilt"></i> 发送邮件
+            </button>
+        </div>
+
+        <!-- 收件箱 -->
+        <div class="mailbox-content">
+            <div class="mailbox-inbox">
+                <div class="inbox-header">
+                    <div class="inbox-title"><span class="status-dot"></span> 收件箱</div>
+                    <div id="emailCount" style="font-size:13px; color:var(--label-secondary);">加载中...</div>
+                </div>
+                <div id="inboxContainer" style="min-height: 300px;">
+                    <div class="inbox-empty">
+                        <i class="ph ph-spinner spinning"></i>
+                        <span>加载中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"><i class="ph-bold ph-check"></i> <span id="toastMsg">成功</span></div>
+
+    <!-- 发送邮件模态框 -->
+    <div class="modal-overlay" id="sendModalOverlay">
+        <div class="sheet-modal">
+            <div class="sheet-header">
+                <button class="sheet-btn" onclick="closeSendModal()">取消</button>
+                <div style="font-weight:600; font-size:16px;">新邮件</div>
+                <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发送</button>
+            </div>
+            <div class="sheet-body">
+                <div class="compose-field">
+                    <span class="compose-label">收件人:</span>
+                    <input type="text" class="compose-input" id="toInput" placeholder="recipient@example.com" oninput="checkComposeInput()">
+                </div>
+                <div class="compose-field">
+                    <span class="compose-label">主题:</span>
+                    <input type="text" class="compose-input" id="subjectInput" placeholder="邮件主题" oninput="checkComposeInput()">
+                </div>
+                <textarea class="compose-area" id="contentInput" placeholder="输入邮件正文..." oninput="checkComposeInput()"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邮件详情模态框 -->
+    <div class="modal-overlay" id="mailDetailModal">
+        <div class="sheet-modal mail-detail-modal">
+            <div class="sheet-header">
+                <button class="sheet-btn" onclick="closeMailDetail()">关闭</button>
+                <div style="font-weight:600; font-size:16px;">邮件详情</div>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="mail-detail-header">
+                <div class="mail-detail-subject" id="mailDetailSubject"></div>
+                <div class="mail-detail-meta">
+                    <div class="mail-detail-avatar" id="mailDetailAvatar"></div>
+                    <div class="mail-detail-info">
+                        <div class="mail-detail-from" id="mailDetailFrom"></div>
+                        <div class="mail-detail-to">收件人: <span id="mailDetailTo"></span></div>
+                    </div>
+                    <div class="mail-detail-time" id="mailDetailTime"></div>
+                </div>
+            </div>
+            <div class="mail-detail-body" id="mailDetailBody"></div>
+        </div>
+    </div>
+
+    <!-- iOS 确认框 -->
+    <div class="modal-overlay" id="iosAlertModal">
+        <div class="ios-alert-box">
+            <div class="ios-alert-content">
+                <h3 id="iosAlertTitle" class="ios-alert-title">确认操作</h3>
+                <p id="iosAlertDesc" class="ios-alert-desc">确定要继续吗？</p>
+            </div>
+            <div class="ios-alert-buttons">
+                <button class="ios-alert-btn cancel">取消</button>
+                <button id="iosAlertConfirmBtn" class="ios-alert-btn destruct">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/js/mailbox.js"></script>
+</body>
+</html>

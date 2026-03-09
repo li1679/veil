@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veil - 登录</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/icons/regular.css">
+    <link rel="stylesheet" href="/css/icons/bold.css">
+    <link rel="stylesheet" href="/css/icons/fill.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#F2F2F7">
+    <meta name="color-scheme" content="light dark">
+    <script type="module" src="/js/theme.js"></script>
+</head>
+<body>
+    <canvas id="aurora-canvas"></canvas>
+
+    <div class="scene" id="loginScene" style="opacity: 0; transition: opacity 0.3s ease;">
+        <div id="loginCard" class="card-3d login-card">
+
+            <div class="login-header layer-3">
+                <div class="login-logo-wrap logo-container">
+                    <i class="ph ph-envelope-simple login-logo-icon" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"></i>
+                </div>
+                <h1 class="login-title">Veil</h1>
+                <p class="login-subtitle">临时邮箱服务</p>
+            </div>
+
+            <form id="loginForm" class="login-form layer-2">
+                <div class="login-field">
+                    <div class="login-field-label">
+                        <i class="ph ph-user"></i>
+                        <span>用户名</span>
+                    </div>
+                    <input type="text" id="loginUsername" placeholder="请输入用户名"
+                           class="apple-input login-input"
+                           autocomplete="username" required>
+                </div>
+
+                <div class="login-field">
+                    <div class="login-field-label">
+                        <i class="ph ph-lock"></i>
+                        <span>密码</span>
+                    </div>
+                    <input type="password" id="loginPassword" placeholder="请输入密码"
+                           class="apple-input login-input"
+                           autocomplete="current-password" required>
+                </div>
+
+                <div id="errorMsg" class="login-error"></div>
+
+                <div class="login-submit-wrap layer-3">
+                    <button type="submit" id="loginBtn"
+                            class="apple-btn login-submit">
+                        <span>登录</span>
+                        <i class="ph ph-arrow-right"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="ph-bold ph-check"></i>
+        <span id="toastMsg">成功</span>
+    </div>
+
+    <script type="module">
+        import { startAurora, initCard3D } from '/js/aurora.js';
+        import { login, checkSession, getRedirectUrl } from '/js/auth.js';
+        import { showToast } from '/js/common.js';
+        import { initTheme } from '/js/theme.js';
+
+        initTheme();
+
+        // 初始化背景动画和3D卡片
+        startAurora();
+        initCard3D('loginCard');
+
+        const loginScene = document.getElementById('loginScene');
+
+        // 检查是否已登录
+        async function checkAuth() {
+            try {
+                const user = await checkSession();
+                if (user) {
+                    window.location.href = getRedirectUrl(user);
+                    return;
+                }
+            } catch (e) {
+                console.error('Auth check failed:', e);
+            }
+            loginScene.style.opacity = '1';
+        }
+        checkAuth();
+
+        // 登录表单处理
+        const form = document.getElementById('loginForm');
+        const usernameInput = document.getElementById('loginUsername');
+        const passwordInput = document.getElementById('loginPassword');
+        const errorMsg = document.getElementById('errorMsg');
+        const loginBtn = document.getElementById('loginBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (loginBtn.disabled) return;
+
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            if (!username || !password) {
+                showError('请输入用户名和密码');
+                return;
+            }
+
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="ph ph-spinner spinning"></i> <span>登录中...</span>';
+
+            const result = await login(username, password);
+
+            if (result.success) {
+                showToast('登录成功');
+                setTimeout(() => {
+                    window.location.href = getRedirectUrl(result.user);
+                }, 150);
+            } else {
+                showError(result.error);
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<span>登录</span><i class="ph ph-arrow-right"></i>';
+            }
+        });
+
+        function showError(msg) {
+            errorMsg.textContent = msg;
+            errorMsg.classList.add('visible');
+            setTimeout(() => {
+                errorMsg.classList.remove('visible');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

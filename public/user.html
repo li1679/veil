@@ -1,0 +1,221 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veil - 临时邮箱</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/icons/regular.css">
+    <link rel="stylesheet" href="/css/icons/bold.css">
+    <link rel="stylesheet" href="/css/icons/fill.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body {
+            background-color: var(--ios-bg);
+            overflow-y: auto;
+        }
+    </style>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#F2F2F7">
+    <meta name="color-scheme" content="light dark">
+    <script type="module" src="/js/theme.js"></script>
+</head>
+<body>
+    <div class="user-layout">
+        <!-- 顶部栏 -->
+        <div class="user-header">
+            <div class="user-brand">
+                <div class="brand-icon">
+                    <i class="ph ph-envelope-simple" style="font-size: 20px;"></i>
+                </div>
+                <div class="brand-text">Veil</div>
+            </div>
+
+            <div class="user-info">
+                <a href="https://github.com/li1679/veil" class="github-pill" target="_blank" rel="noopener noreferrer">
+                    <i class="ph-fill ph-github-logo"></i>
+                    <span>GitHub</span>
+                </a>
+                <span class="quota-badge" id="quotaDisplay">加载中...</span>
+                <div class="avatar" id="userAvatar">U</div>
+                <span id="userName" style="font-weight: 500; color: var(--label-primary);">用户</span>
+                <button class="btn btn-ghost" id="logoutBtn" style="height: 36px; padding: 0 14px;">
+                    <i class="ph ph-sign-out"></i> 退出
+                </button>
+            </div>
+        </div>
+
+        <!-- 主内容 -->
+        <div class="user-content">
+            <!-- 邮箱显示 -->
+            <div class="email-display-container" role="button" tabindex="0" aria-label="查看收件箱" onclick="scrollToInbox()">
+                <div class="current-email" id="fullEmailDisplay">
+                    <span id="prefixText"></span><span id="suffixText" style="color:var(--label-secondary);"></span>
+                </div>
+                <div class="click-hint">点击查看收件箱</div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="actions-row disabled" id="actionButtons">
+                <button class="btn btn-secondary" onclick="copyEmail()"><i class="ph-bold ph-copy"></i> <span>复制</span></button>
+                <button class="btn btn-secondary" onclick="refreshInbox()"><i class="ph-bold ph-arrows-clockwise"></i> <span>刷新</span></button>
+                <button class="btn btn-primary" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发送</span></button>
+                <button class="btn btn-danger" onclick="confirmClearInbox()"><i class="ph-bold ph-trash"></i> <span>清空</span></button>
+            </div>
+
+            <!-- 配置和历史 -->
+            <div class="dashboard-grid">
+                <div class="panel-group">
+                    <div class="group-header">生成配置</div>
+                    <div class="ios-card">
+                        <div style="font-size:13px; margin-bottom:6px; font-weight:500;">域名后缀</div>
+                        <div class="custom-select-wrapper" id="domainSelectWrapper">
+                            <div class="select-trigger" id="domainSelectTrigger" role="button" tabindex="0" aria-label="选择域名后缀" aria-haspopup="listbox" aria-expanded="false" onclick="toggleDropdown()">
+                                <span id="selectedDomain">加载中...</span>
+                                <i class="ph-bold ph-caret-down caret-muted"></i>
+                            </div>
+                            <ul class="options-list" id="domainOptions"></ul>
+                        </div>
+
+                        <div class="form-row setting-row setting-row-spaced">
+                            <div>
+                                <div style="font-size:14px; font-weight:500;">随机域名后缀</div>
+                                <div class="muted-caption">开启后每次生成都会随机选择域名</div>
+                            </div>
+                            <div class="ios-switch" id="randomDomainSwitch" role="button" tabindex="0" aria-label="切换随机域名后缀" onclick="toggleRandomDomain()">
+                                <div class="ios-switch-thumb"></div>
+                            </div>
+                        </div>
+
+                        <div style="font-size:13px; margin-bottom:6px; font-weight:500;">有效时长</div>
+                        <div class="segment-container segment-4">
+                            <div class="segment-bg" id="expirySegmentBg"></div>
+                            <button class="segment-btn" onclick="setExpiry(this, '1h', 0)">1小时</button>
+                            <button class="segment-btn active" onclick="setExpiry(this, '24h', 1)">1天</button>
+                            <button class="segment-btn" onclick="setExpiry(this, '3d', 2)">3天</button>
+                            <button class="segment-btn" onclick="setExpiry(this, 'permanent', 3)">永久</button>
+                        </div>
+
+                        <div style="font-size:13px; margin-bottom:6px; font-weight:500;">前缀模式</div>
+                        <div class="segment-container">
+                            <div class="segment-bg" id="segmentBg"></div>
+                            <button class="segment-btn active" onclick="setPrefixMode(this, 'random', 0)">随机</button>
+                            <button class="segment-btn" onclick="setPrefixMode(this, 'name', 1)">人名</button>
+                            <button class="segment-btn" onclick="setPrefixMode(this, 'custom', 2)">自定义</button>
+                        </div>
+
+                        <input type="text" class="custom-input" id="customInputBox" placeholder="输入自定义前缀...">
+
+                        <div id="lengthSection" class="slider-container">
+                            <div class="slider-header">
+                                <span>长度</span>
+                                <span id="lengthDisplay" style="color:var(--accent-blue);">12</span>
+                            </div>
+                            <input type="range" id="lengthSlider" min="4" max="20" value="12" oninput="updateLengthLabel(this.value)">
+                        </div>
+
+                        <button class="btn btn-primary" onclick="generateEmail()" style="width: 100%; margin-top: 24px; justify-content: center;">
+                            立即生成
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0 16px;">
+                        <div class="group-header" style="padding:0;">历史邮箱</div>
+                        <i class="ph ph-trash" role="button" tabindex="0" aria-label="清空历史邮箱" onclick="confirmClearHistory()" style="font-size:14px; color:var(--label-secondary); cursor:pointer;" title="清空所有"></i>
+                    </div>
+                    <div class="ios-card" style="padding: 10px 20px;">
+                        <div class="history-list" id="historyListContainer">
+                            <div style="text-align:center; padding: 20px; color:var(--label-tertiary); font-size:13px;">
+                                加载中...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 收件箱 -->
+            <div class="inbox-section" id="inboxSection">
+                <div class="inbox-header">
+                    <div class="inbox-title"><span class="status-dot"></span> 收件箱</div>
+                    <div style="font-size:13px; color:var(--label-secondary);">监听中</div>
+                </div>
+                <div id="inboxContainer" class="inbox-empty">
+                    <i class="ph ph-tray"></i>
+                    <span>暂无新邮件</span>
+                    <span style="font-size:12px; color:var(--label-tertiary); margin-top:4px;">每 5 秒自动刷新</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"><i class="ph-bold ph-check"></i> <span id="toastMsg">成功</span></div>
+
+    <!-- 发送邮件模态框 -->
+    <div class="modal-overlay" id="sendModalOverlay">
+        <div class="sheet-modal">
+            <div class="sheet-header">
+                <button class="sheet-btn" onclick="closeSendModal()">取消</button>
+                <div style="font-weight:600; font-size:16px;">新邮件</div>
+                <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发送</button>
+            </div>
+            <div class="sheet-body">
+                <div class="compose-field">
+                    <span class="compose-label">发件名称:</span>
+                    <input type="text" class="compose-input" id="senderNameInput" placeholder="例如: Veil" oninput="checkComposeInput()">
+                </div>
+                <div class="compose-field">
+                    <span class="compose-label">收件人:</span>
+                    <input type="text" class="compose-input" id="toInput" placeholder="recipient@example.com" oninput="checkComposeInput()">
+                </div>
+                <div class="compose-field">
+                    <span class="compose-label">主题:</span>
+                    <input type="text" class="compose-input" id="subjectInput" placeholder="邮件主题" oninput="checkComposeInput()">
+                </div>
+                <textarea class="compose-area" id="contentInput" placeholder="输入邮件正文..." oninput="checkComposeInput()"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邮件详情模态框 -->
+    <div class="modal-overlay" id="mailDetailModal">
+        <div class="sheet-modal mail-detail-modal">
+            <div class="sheet-header">
+                <button class="sheet-btn" onclick="closeMailDetail()">关闭</button>
+                <div style="font-weight:600; font-size:16px;">邮件详情</div>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="mail-detail-header">
+                <div class="mail-detail-subject" id="mailDetailSubject"></div>
+                <div class="mail-detail-meta">
+                    <div class="mail-detail-avatar" id="mailDetailAvatar"></div>
+                    <div class="mail-detail-info">
+                        <div class="mail-detail-from" id="mailDetailFrom"></div>
+                        <div class="mail-detail-to">收件人: <span id="mailDetailTo"></span></div>
+                    </div>
+                    <div class="mail-detail-time" id="mailDetailTime"></div>
+                </div>
+            </div>
+            <div class="mail-detail-body" id="mailDetailBody"></div>
+        </div>
+    </div>
+
+    <!-- iOS 确认框 -->
+    <div class="modal-overlay" id="iosAlertModal">
+        <div class="ios-alert-box">
+            <div class="ios-alert-content">
+                <h3 id="iosAlertTitle" class="ios-alert-title">确认操作</h3>
+                <p id="iosAlertDesc" class="ios-alert-desc">确定要继续吗？</p>
+            </div>
+            <div class="ios-alert-buttons">
+                <button class="ios-alert-btn cancel">取消</button>
+                <button id="iosAlertConfirmBtn" class="ios-alert-btn destruct">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/js/user.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veil - 临时邮箱服务</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+            background: #F2F2F7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s ease;
+        }
+        .loading-container {
+            text-align: center;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #E5E5EA;
+            border-top-color: #007AFF;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #3C3C4399;
+            font-size: 14px;
+        }
+        [data-theme='dark'] body {
+            background: #000000;
+        }
+        [data-theme='dark'] .spinner {
+            border-color: #2C2C2E;
+            border-top-color: #0A84FF;
+        }
+        [data-theme='dark'] .loading-text {
+            color: #EBEBF599;
+        }
+    </style>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#F2F2F7">
+    <meta name="color-scheme" content="light dark">
+    <script type="module" src="/js/theme.js"></script>
+</head>
+<body>
+    <div class="loading-container">
+        <div class="spinner"></div>
+        <div class="loading-text">正在加载...</div>
+    </div>
+
+    <script type="module">
+        import { checkSession, getRedirectUrl } from '/js/auth.js';
+        import { initTheme } from '/js/theme.js';
+
+        initTheme();
+
+        async function init() {
+            try {
+                const user = await checkSession();
+
+                if (user) {
+                    // 已登录，重定向到对应页面
+                    window.location.href = getRedirectUrl(user);
+                } else {
+                    // 未登录，重定向到登录页
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                console.error('Session check failed:', error);
+                // 出错时也重定向到登录页
+                window.location.href = '/login.html';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

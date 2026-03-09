@@ -1,0 +1,41 @@
+name = "veil1"
+main = "src/server.js"
+compatibility_date = "2024-01-01"
+keep_vars = true
+
+# D1 database binding
+[[d1_databases]]
+binding = "TEMP_MAIL_DB"
+database_name = "veil_db" # your D1 database name
+# TIP: omit database_id to allow Wrangler to auto-provision or to avoid hardcoding account-specific IDs.
+
+# Environment variables
+# IMPORTANT: do NOT commit real credentials here.
+# Set them in the Cloudflare Dashboard (Worker -> Settings -> Variables/Secrets).
+# Example (do not use in production):
+# [vars]
+# ADMIN_NAME = "admin"
+# ADMIN_PASSWORD = "123"
+# JWT_TOKEN = "change-me"
+# MAIL_DOMAIN = "example.com"
+
+
+# Static assets (Workers + Assets)
+[assets]
+directory = "public"
+# Explicit binding name so env.ASSETS is available in Worker
+binding = "ASSETS"
+
+
+# R2 bucket binding (stores full EML content)
+[[r2_buckets]]
+binding = "MAIL_EML"
+# TIP: omit bucket_name to allow Wrangler to auto-provision an R2 bucket for this Worker.
+
+# wrangler.toml (wrangler v3.88.0^) logs
+# [observability.logs]
+# enabled = true
+
+# Cron triggers for scheduled cleanup
+[triggers]
+crons = ["0 */6 * * *"]
