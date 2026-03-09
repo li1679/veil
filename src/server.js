@@ -101,6 +101,18 @@ export default {
 
       forwardByLocalPart(message, localPart, ctx, env);
 
+      const mailbox = extractEmail(resolvedRecipient || toHeader);
+      const sender = extractEmail(fromHeader);
+
+      // 前置校验：邮箱不存在/过期则快速拒收（不解析、不写 R2）
+      const mailboxId = await getMailboxIdForReceive(DB, mailbox);
+      if (!mailboxId) {
+        try {
+          if (typeof message?.setReject === 'function') message.setReject('Mailbox expired');
+        } catch (_) {}
+        return;
+      }
+
       // 读取原始 EML（用于存入 R2）与解析文本/HTML 以生成摘要
       let textContent = '';
       let htmlContent = '';
@@ -117,9 +129,6 @@ export default {
         textContent = '';
         htmlContent = '';
       }
-
-      const mailbox = extractEmail(resolvedRecipient || toHeader);
-      const sender = extractEmail(fromHeader);
 
       // 写入到 R2：完整 EML
       const r2 = env.MAIL_EML;
@@ -151,21 +160,6 @@ export default {
       try {
         verificationCode = extractVerificationCode({ subject, text: textContent, html: htmlContent });
       } catch (_) {}
-
-      // 写入新表结构（仅主要信息 + R2 引用）
-      const softTtlRaw = env?.SOFT_TTL_AUTO_HOURS;
-      const softTtlHours = (() => {
-        const n = Number(softTtlRaw);
-        if (!Number.isFinite(n) || n <= 0) return 24;
-        return n;
-      })();
-      const mailboxId = await getMailboxIdForReceive(DB, mailbox, { ttlHours: softTtlHours });
-      if (!mailboxId) {
-        try {
-          if (typeof message?.setReject === 'function') message.setReject('Mailbox expired');
-        } catch (_) {}
-        return;
-      }
 
       // 收件人（逗号拼接）
       let toAddrs = '';

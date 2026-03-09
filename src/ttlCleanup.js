@@ -23,6 +23,9 @@ export async function ttlCleanup(db, r2, options = {}) {
     errors: []
   };
 
+  // 永久禁用自动清理（永不自动删除）
+  return stats;
+
   try {
     // 1. 查找过期的邮箱
     const expiredMailboxes = await db.prepare(`
