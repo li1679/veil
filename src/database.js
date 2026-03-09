@@ -374,13 +374,15 @@ function normalizeOptionalD1Timestamp(value) {
 }
 
 /**
- * 邮件接收场景：获取活跃邮箱ID（不存在或已过期则返回 null，不自动创建）
+ * 邮件接收场景：获取邮箱ID（若不存在则按 Soft-TTL 自动创建）
  * @param {object} db - 数据库连接对象
  * @param {string} address - 邮箱地址
+ * @param {object} opts - 选项
+ * @param {number} opts.ttlHours - 自动创建邮箱的 TTL（小时），默认 24
  * @returns {Promise<number|null>} mailboxId 或 null
  */
-export async function getMailboxIdForReceive(db, address) {
-  const { updateMailboxIdCache } = await import('./cacheHelper.js');
+export async function getMailboxIdForReceive(db, address, { ttlHours = 24 } = {}) {
+  const { updateMailboxIdCache, invalidateSystemStatCache } = await import('./cacheHelper.js');
 
   const normalized = String(address || '').trim().toLowerCase();
   if (!normalized) return null;
@@ -404,7 +406,36 @@ export async function getMailboxIdForReceive(db, address) {
       .bind(id).run().catch(() => {});
     return id;
   }
-  return null;
+
+  const any = await db.prepare('SELECT id FROM mailboxes WHERE address = ? LIMIT 1').bind(normalized).all();
+  if (any.results && any.results.length > 0) {
+    return null;
+  }
+
+  const hours = Number(ttlHours);
+  const safeHours = (Number.isFinite(hours) && hours > 0) ? hours : 24;
+  const expiresAt = normalizeOptionalD1Timestamp(Date.now() + safeHours * 60 * 60 * 1000);
+
+  try {
+    await db.prepare(
+      'INSERT INTO mailboxes (address, local_part, domain, password_hash, created_by_user_id, last_accessed_at, expires_at) VALUES (?, ?, ?, NULL, NULL, CURRENT_TIMESTAMP, ?)'
+    ).bind(normalized, local_part, domain, expiresAt).run();
+  } catch (e) {
+    const msg = String(e?.message || e).toLowerCase();
+    if (!msg.includes('unique') && !msg.includes('constraint')) {
+      throw e;
+    }
+  }
+
+  const created = await db.prepare(
+    'SELECT id FROM mailboxes WHERE address = ? AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1'
+  ).bind(normalized).all();
+  const newId = created?.results?.[0]?.id || null;
+  if (newId) {
+    updateMailboxIdCache(normalized, newId);
+    invalidateSystemStatCache('total_mailboxes');
+  }
+  return newId;
 }
 
 /**

@@ -8,23 +8,25 @@ import { requireAdmin, logout } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, openIOSAlert,
     animateDelete, animateBatchDelete, toggleUserMenu, initCommon,
-    formatTime, formatDate, extractCode, escapeHtml, sanitizeEmailHtml,
-    fitMailHtmlToViewport, getStorage, setStorage, removeStorage
+    formatTime, formatDate, escapeHtml,
+    getStorage, setStorage, removeStorage
 } from './common.js';
 import { toggleTheme } from './theme.js';
+import { createInboxController } from './inbox.js';
+import { createComposeController } from './compose.js';
+import { createDomainSelector } from './domain-selector.js';
 
 // ============================================
 // 全局状态
 // ============================================
 let currentUser = null;
-let domains = [];
 let currentEmail = null;
 let emailHistory = [];
-let currentInboxEmails = [];
 let users = [];
 let allMailboxes = [];
 let selectedUserIds = new Set();
 let selectedEmailIds = new Set();
+let selectedExpiry = '24h';
 let viewerMailbox = null;
 let viewerEmails = [];
 let allMailboxesLoadController = null;
@@ -56,9 +58,9 @@ function clearCurrentEmailState() {
     removeStorage(getLastMailboxStorageKey());
     document.getElementById('fullEmailDisplay')?.classList.remove('visible');
     document.getElementById('actionButtons')?.classList.add('disabled');
-    stopInboxPoll();
+    inbox.stopInboxPoll();
     try {
-        renderInbox([]);
+        inbox.renderInbox([]);
     } catch (_) {
         // ignore
     }
@@ -97,15 +99,38 @@ function applyMailboxDeletionsToHome(addresses = []) {
     renderHistory();
 }
 
-// 配置
-let prefixMode = 'random';
-let selectedDomain = '';
-let prefixLength = 12;
-let randomDomainSuffix = false;
+// ============================================
+// 共享控制器初始化
+// ============================================
+const domainSelector = createDomainSelector({ domainAPI });
 
-// 轮询
-let inboxPollInterval = null;
-const POLL_INTERVAL = 5000; // 5秒
+async function loadInbox() {
+    if (!currentEmail) return;
+    try {
+        const response = await emailAPI.getEmails(currentEmail);
+        const emails = response.emails || [];
+        inbox.renderInbox(emails);
+        const historyItem = emailHistory.find(h => h.email === currentEmail);
+        if (historyItem && historyItem.emailCount !== emails.length) {
+            historyItem.emailCount = emails.length;
+            renderHistory();
+        }
+    } catch (error) {
+        console.error('Failed to load inbox:', error);
+    }
+}
+
+const inbox = createInboxController({
+    emailAPI,
+    loadInbox,
+    getActiveEmail: () => currentEmail,
+});
+
+createComposeController({
+    sendAPI: emailAPI,
+    getFromAddress: () => currentEmail,
+    hasSenderName: true,
+});
 
 // ============================================
 // 初始化
@@ -123,7 +148,7 @@ async function init() {
     applyUserManagementAccessUI();
 
     // 加载域名列表
-    await loadDomains();
+    await domainSelector.loadDomains();
 
     // 加载历史邮箱
     await loadHistory();
@@ -222,112 +247,14 @@ window.switchView = function(viewName) {
 };
 
 // ============================================
-// 域名选择
+// 过期时间选择
 // ============================================
-async function loadDomains() {
-    try {
-        const response = await domainAPI.getDomains();
-        domains = response.domains || [];
-
-        if (domains.length > 0) {
-            selectedDomain = domains[0];
-            renderDomainDropdown();
-        }
-    } catch (error) {
-        console.error('Failed to load domains:', error);
-        showToast('加载域名失败');
-    }
-}
-
-function renderDomainDropdown() {
-    const trigger = document.getElementById('selectedDomain');
-    const optionsList = document.getElementById('domainOptions');
-
-    if (trigger) trigger.textContent = selectedDomain;
-    if (!optionsList) return;
-
-    optionsList.innerHTML = domains.map((domain) => {
-        const safeDomain = escapeHtml(domain);
-        return `
-            <li class="option ${domain === selectedDomain ? 'selected' : ''}"
-                data-action="select-domain" data-domain="${safeDomain}">${safeDomain}</li>
-        `;
-    }).join('');
-}
-
-window.toggleDropdown = function() {
-    if (randomDomainSuffix) return;
-    const dropdown = document.getElementById('domainOptions');
-    if (dropdown) dropdown.classList.toggle('show');
-};
-
-window.selectDomain = function(el, domain) {
-    selectedDomain = domain;
-    document.getElementById('selectedDomain').textContent = domain;
-    document.querySelectorAll('#domainOptions .option').forEach(o => o.classList.remove('selected'));
-    el.classList.add('selected');
-    document.getElementById('domainOptions').classList.remove('show');
-};
-
-// 点击外部关闭下拉框
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.custom-select-wrapper')) {
-        const dropdown = document.getElementById('domainOptions');
-        if (dropdown) dropdown.classList.remove('show');
-    }
-});
-
-function getDomainForGeneration() {
-    if (randomDomainSuffix && Array.isArray(domains) && domains.length > 0) {
-        return domains[Math.floor(Math.random() * domains.length)];
-    }
-    return selectedDomain || (domains && domains[0]) || '';
-}
-
-function updateRandomDomainUI() {
-    const sw = document.getElementById('randomDomainSwitch');
-    if (sw) sw.classList.toggle('on', randomDomainSuffix);
-
-    const wrapper = document.getElementById('domainSelectWrapper');
-    if (wrapper) {
-        wrapper.style.pointerEvents = randomDomainSuffix ? 'none' : '';
-        wrapper.style.opacity = randomDomainSuffix ? '0.6' : '';
-    }
-
-    const dropdown = document.getElementById('domainOptions');
-    if (randomDomainSuffix && dropdown) dropdown.classList.remove('show');
-}
-
-window.toggleRandomDomain = function() {
-    randomDomainSuffix = !randomDomainSuffix;
-    updateRandomDomainUI();
-};
-
-// ============================================
-// 前缀模式
-// ============================================
-window.setPrefixMode = function(btn, mode, index) {
-    prefixMode = mode;
-    document.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+window.setExpiry = function(btn, value, index) {
+    selectedExpiry = value;
+    const container = btn.parentElement;
+    container.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('segmentBg').style.transform = `translateX(${index * 100}%)`;
-
-    const customInput = document.getElementById('customInputBox');
-    const lengthSection = document.getElementById('lengthSection');
-
-    if (mode === 'custom') {
-        customInput.style.display = 'block';
-        lengthSection.style.display = 'none';
-        customInput.focus();
-    } else {
-        customInput.style.display = 'none';
-        lengthSection.style.display = 'block';
-    }
-};
-
-window.updateLengthLabel = function(val) {
-    prefixLength = parseInt(val);
-    document.getElementById('lengthDisplay').textContent = val;
+    container.querySelector('.segment-bg').style.transform = `translateX(${index * 100}%)`;
 };
 
 // ============================================
@@ -336,7 +263,9 @@ window.updateLengthLabel = function(val) {
 window.generateEmail = async function() {
     try {
         let response;
-        const domain = getDomainForGeneration();
+        const domain = domainSelector.getDomainForGeneration();
+        const prefixMode = domainSelector.getPrefixMode();
+        const prefixLength = domainSelector.getPrefixLength();
 
         if (prefixMode === 'custom') {
             const prefix = document.getElementById('customInputBox').value.trim();
@@ -344,16 +273,16 @@ window.generateEmail = async function() {
                 showToast('请输入前缀');
                 return;
             }
-            response = await mailboxAPI.create(prefix, domain);
+            response = await mailboxAPI.create(prefix, domain, selectedExpiry);
         } else {
-            response = await mailboxAPI.generate(domain, prefixMode, prefixLength);
+            response = await mailboxAPI.generate(domain, prefixMode, prefixLength, selectedExpiry);
         }
 
         if (response && response.address) {
             setCurrentEmail(response.address);
             addToHistory(response.address);
             showToast('邮箱已生成');
-            startInboxPoll();
+            inbox.startInboxPoll();
         }
     } catch (error) {
         console.error('Generate failed:', error);
@@ -470,7 +399,7 @@ function renderHistory() {
 
 window.restoreEmail = function(email) {
     setCurrentEmail(email);
-    startInboxPoll();
+    inbox.startInboxPoll();
     loadInbox();
 };
 
@@ -498,7 +427,7 @@ window.confirmDeleteHistory = function(id) {
                         removeStorage(getLastMailboxStorageKey());
                         document.getElementById('fullEmailDisplay').classList.remove('visible');
                         document.getElementById('actionButtons').classList.add('disabled');
-                        stopInboxPoll();
+                        inbox.stopInboxPoll();
                     }
                 });
                 showToast('已删除');
@@ -519,7 +448,7 @@ window.confirmClearHistory = function() {
             removeStorage(getLastMailboxStorageKey());
             document.getElementById('fullEmailDisplay').classList.remove('visible');
             document.getElementById('actionButtons').classList.add('disabled');
-            stopInboxPoll();
+            inbox.stopInboxPoll();
             renderHistory();
             showToast('已清空');
         } catch (error) {
@@ -546,17 +475,12 @@ window.copyMailboxAddress = function(address, event) {
     copyText(address);
 };
 
-window.refreshInbox = async function() {
-    await loadInbox();
-    showToast('已刷新');
-};
-
 window.confirmClearInbox = function() {
     if (!currentEmail) return;
     openIOSAlert('清空收件箱', '确定清空当前邮箱的所有邮件吗？', async () => {
         try {
             await emailAPI.clear(currentEmail);
-            renderInbox([]);
+            inbox.renderInbox([]);
             showToast('已清空');
         } catch (error) {
             showToast(error.message || '清空失败');
@@ -566,225 +490,6 @@ window.confirmClearInbox = function() {
 
 window.scrollToInbox = function() {
     document.getElementById('inboxSection').scrollIntoView({ behavior: 'smooth' });
-};
-
-// ============================================
-// 收件箱
-// ============================================
-async function loadInbox() {
-    if (!currentEmail) return;
-
-    try {
-        const response = await emailAPI.getEmails(currentEmail);
-        const emails = response.emails || [];
-        renderInbox(emails);
-
-        // 更新历史记录中的邮件数量
-        const historyItem = emailHistory.find(h => h.email === currentEmail);
-        if (historyItem && historyItem.emailCount !== emails.length) {
-            historyItem.emailCount = emails.length;
-            renderHistory();
-        }
-    } catch (error) {
-        console.error('Failed to load inbox:', error);
-    }
-}
-
-function getInboxEmailById(id) {
-    return (currentInboxEmails || []).find((item) => String(item.id) == String(id));
-}
-
-function getEmailPreviewText(email) {
-    return String(email?.text || email?.preview || '').trim();
-}
-
-function getEmailVerificationCode(email) {
-    return email?.verification_code || extractCode(`${email?.subject || ''} ${getEmailPreviewText(email)}`);
-}
-
-function renderInbox(emails) {
-    const container = document.getElementById('inboxContainer');
-    if (!container) return;
-
-    currentInboxEmails = Array.isArray(emails) ? emails : [];
-
-    if (currentInboxEmails.length === 0) {
-        container.classList.add('inbox-empty');
-        container.innerHTML = `
-            <i class="ph ph-tray"></i>
-            <span>暂无新邮件</span>
-        `;
-        return;
-    }
-
-    // Inbox container starts as an "empty state" flexbox in HTML; remove it when rendering list items.
-    container.classList.remove('inbox-empty');
-    container.innerHTML = currentInboxEmails.map(email => {
-        const fromRaw = email.from_name || email.from_address || 'U';
-        const subjectRaw = email.subject || '(无主题)';
-        const previewRaw = getEmailPreviewText(email).slice(0, 120);
-        const avatarChar = String(fromRaw || 'U').trim().charAt(0).toUpperCase();
-        return `
-            <div class="mail-item" role="button" tabindex="0" data-action="open-mail-detail" data-id="${email.id}">
-                <div class="mail-avatar">${escapeHtml(avatarChar || 'U')}</div>
-                <div class="mail-content">
-                    <div class="mail-from">${escapeHtml(fromRaw)}</div>
-                    <div class="mail-subject">${escapeHtml(subjectRaw)}</div>
-                    <div class="mail-preview">${escapeHtml(previewRaw)}</div>
-                </div>
-                <div class="mail-meta">
-                    <div class="mail-time">${formatTime(email.received_at)}</div>
-                    <div class="mail-actions">
-                    <button class="action-btn" type="button" data-action="copy-email-code" data-id="${email.id}" title="复制验证码">
-                        <i class="ph-bold ph-copy"></i>
-                    </button>
-                    <button class="action-btn delete" type="button" data-action="delete-email-item" data-id="${email.id}" title="删除邮件">
-                        <i class="ph-bold ph-trash"></i>
-                    </button>
-                </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-window.copyEmailCode = function(event, id) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    const email = getInboxEmailById(id);
-    const code = getEmailVerificationCode(email);
-    if (!code) {
-        showToast('无法复制');
-        return;
-    }
-    copyText(code);
-};
-
-window.deleteEmailItem = async function(event, id) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    try {
-        await emailAPI.delete(id);
-        showToast('已删除');
-        await loadInbox();
-    } catch (error) {
-        showToast(error.message || '删除失败');
-    }
-};
-
-window.openMailDetail = async function(id) {
-    try {
-        const response = await emailAPI.getEmail(id);
-        const email = response.email || response;
-
-        document.getElementById('mailDetailSubject').textContent = email.subject || '(无主题)';
-        document.getElementById('mailDetailAvatar').textContent = (email.from_name || email.from_address || 'U')[0].toUpperCase();
-        document.getElementById('mailDetailFrom').textContent = email.from_name || email.from_address;
-        document.getElementById('mailDetailTo').textContent = email.to_address;
-        document.getElementById('mailDetailTime').textContent = formatTime(email.received_at);
-        const safeHtml = sanitizeEmailHtml(email.html);
-        const detailBody = document.getElementById('mailDetailBody');
-        if (detailBody) {
-            detailBody.innerHTML = safeHtml
-                ? `<div class="mail-html-fit"><div class="mail-html-sanitized">${safeHtml}</div></div>`
-                : `<pre>${escapeHtml(email.text || '')}</pre>`;
-        }
-
-        openModal('mailDetailModal');
-        requestAnimationFrame(() => fitMailHtmlToViewport('mailDetailBody'));
-    } catch (error) {
-        showToast(error.message || '加载失败');
-    }
-};
-
-window.closeMailDetail = function() {
-    closeModal('mailDetailModal');
-};
-
-// 收件箱轮询
-function startInboxPoll() {
-    stopInboxPoll();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    handleVisibilityChange();
-}
-
-function stopInboxPoll() {
-    if (inboxPollInterval) {
-        clearInterval(inboxPollInterval);
-        inboxPollInterval = null;
-    }
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-}
-
-function handleVisibilityChange() {
-    if (document.hidden) {
-        if (inboxPollInterval) {
-            clearInterval(inboxPollInterval);
-            inboxPollInterval = null;
-        }
-        return;
-    }
-
-    if (!inboxPollInterval && currentEmail) {
-        loadInbox();
-        inboxPollInterval = setInterval(loadInbox, POLL_INTERVAL);
-    }
-}
-
-// ============================================
-// 发送邮件
-// ============================================
-window.openSendModal = function() {
-    if (!currentEmail) {
-        showToast('请先生成邮箱');
-        return;
-    }
-    document.getElementById('senderNameInput').value = '';
-    document.getElementById('toInput').value = '';
-    document.getElementById('subjectInput').value = '';
-    document.getElementById('contentInput').value = '';
-    checkComposeInput();
-    openModal('sendModalOverlay');
-};
-
-window.closeSendModal = function() {
-    closeModal('sendModalOverlay');
-};
-
-window.checkComposeInput = function() {
-    const to = document.getElementById('toInput').value.trim();
-    const subject = document.getElementById('subjectInput').value.trim();
-    const btn = document.getElementById('sendBtn');
-
-    if (to && subject) {
-        btn.classList.add('active');
-    } else {
-        btn.classList.remove('active');
-    }
-};
-
-window.doSendEmail = async function() {
-    const fromName = document.getElementById('senderNameInput').value.trim() || 'Veil';
-    const to = document.getElementById('toInput').value.trim();
-    const subject = document.getElementById('subjectInput').value.trim();
-    const content = document.getElementById('contentInput').value.trim();
-
-    if (!to || !subject) {
-        showToast('请填写收件人和主题');
-        return;
-    }
-
-    try {
-        await emailAPI.send(currentEmail, fromName, to, subject, content);
-        closeSendModal();
-        showToast('邮件已发送');
-    } catch (error) {
-        showToast(error.message || '发送失败');
-    }
 };
 
 // ============================================

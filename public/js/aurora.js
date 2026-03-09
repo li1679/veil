@@ -128,17 +128,6 @@ export function startAurora(canvasId = 'aurora-canvas') {
     window.addEventListener('veil:themechange', initCanvas);
 }
 
-export function stopAurora() {
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-    if (cardAnimationId) {
-        cancelAnimationFrame(cardAnimationId);
-        cardAnimationId = null;
-    }
-}
-
 
 // ============================================
 // 3D 卡片效果

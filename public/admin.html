@@ -7,8 +7,9 @@
     <meta name="theme-color" content="#F2F2F7">
     <meta name="color-scheme" content="light dark">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="preconnect" href="https://unpkg.com">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="/css/icons/regular.css">
+    <link rel="stylesheet" href="/css/icons/bold.css">
+    <link rel="stylesheet" href="/css/icons/fill.css">
     <link rel="stylesheet" href="/css/styles.css">
     <style>
         /* 防止加载时黑屏 */
@@ -49,16 +50,16 @@
                                 <i class="ph-bold ph-moon" id="themeMenuIcon"></i>
                                 <span id="themeLabel">暗黑模式</span>
                             </div>
-                            <div class="ios-switch" id="themeSwitch" role="switch" aria-checked="false"><div class="ios-switch-thumb"></div></div>
+                            <div class="ios-switch" id="themeSwitch"><div class="ios-switch-thumb"></div></div>
                         </div>
                         <div class="menu-item danger" id="logoutMenuItem" role="button" tabindex="0" aria-label="退出登录">
                             <i class="ph-bold ph-sign-out"></i> 退出登录
                         </div>
                     </div>
                     <div class="user-profile" role="button" tabindex="0" aria-label="打开用户菜单">
-                        <div class="avatar" id="adminAvatar">A</div>
+                        <div class="avatar">A</div>
                         <div style="flex:1;">
-                            <div class="name-text" id="adminDisplayName" style="font-size:14px; font-weight:600;">Admin</div>
+                            <div class="name-text" style="font-size:14px; font-weight:600;">Super Admin</div>
                             <span class="badge-admin">Super Admin</span>
                         </div>
                     </div>
@@ -125,9 +126,18 @@
                                             <div style="font-size:14px; font-weight:500;">随机域名后缀</div>
                                             <div class="muted-caption">开启后每次生成都会随机选择域名</div>
                                         </div>
-                                        <div class="ios-switch" id="randomDomainSwitch" role="switch" aria-checked="false" tabindex="0" aria-label="切换随机域名后缀" onclick="toggleRandomDomain()">
+                                        <div class="ios-switch" id="randomDomainSwitch" role="button" tabindex="0" aria-label="切换随机域名后缀" onclick="toggleRandomDomain()">
                                             <div class="ios-switch-thumb"></div>
                                         </div>
+                                    </div>
+
+                                    <div style="font-size:13px; margin-bottom:6px; font-weight:500;">有效时长</div>
+                                    <div class="segment-container segment-4">
+                                        <div class="segment-bg" id="expirySegmentBg" style="transform:translateX(100%)"></div>
+                                        <button class="segment-btn" onclick="setExpiry(this, '1h', 0)">1小时</button>
+                                        <button class="segment-btn active" onclick="setExpiry(this, '24h', 1)">1天</button>
+                                        <button class="segment-btn" onclick="setExpiry(this, '3d', 2)">3天</button>
+                                        <button class="segment-btn" onclick="setExpiry(this, 'permanent', 3)">永久</button>
                                     </div>
 
                                     <div style="font-size:13px; margin-bottom:6px; font-weight:500;">前缀模式</div>
@@ -177,6 +187,7 @@
                             <div id="inboxContainer" class="inbox-empty">
                                 <i class="ph ph-tray"></i>
                                 <span>暂无新邮件</span>
+                                <span style="font-size:12px; color:var(--label-tertiary); margin-top:4px;">每 5 秒自动刷新</span>
                             </div>
                         </div>
                     </div>
@@ -286,11 +297,11 @@
     <div class="toast" id="toast"><i class="ph-bold ph-check"></i> <span id="toastMsg">成功</span></div>
 
     <!-- 发送邮件模态框 -->
-    <div class="modal-overlay" id="sendModalOverlay" aria-labelledby="adminSendModalTitle">
+    <div class="modal-overlay" id="sendModalOverlay">
         <div class="sheet-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeSendModal()">取消</button>
-                <div id="adminSendModalTitle" style="font-weight:600; font-size:16px;">新邮件</div>
+                <div style="font-weight:600; font-size:16px;">新邮件</div>
                 <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发送</button>
             </div>
             <div class="sheet-body">
@@ -312,11 +323,11 @@
     </div>
 
     <!-- 邮件详情模态框 -->
-    <div class="modal-overlay" id="mailDetailModal" aria-labelledby="adminMailDetailTitle">
+    <div class="modal-overlay" id="mailDetailModal">
         <div class="sheet-modal mail-detail-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeMailDetail()">关闭</button>
-                <div id="adminMailDetailTitle" style="font-weight:600; font-size:16px;">邮件详情</div>
+                <div style="font-weight:600; font-size:16px;">邮件详情</div>
                 <div style="width: 50px;"></div>
             </div>
             <div class="mail-detail-header">
@@ -353,7 +364,7 @@
     </div>
 
     <!-- 用户编辑模态框 -->
-    <div class="modal-overlay" id="userModal" aria-labelledby="modalTitle">
+    <div class="modal-overlay" id="userModal">
         <div class="modal-card">
             <h3 style="font-size:18px; font-weight:700; margin-bottom:20px;" id="modalTitle">编辑用户</h3>
 
@@ -385,7 +396,7 @@
                     <div style="font-size:14px; font-weight:500;">允许发送邮件</div>
                     <div class="muted-caption">开启后该用户可发送邮件</div>
                 </div>
-                <div class="ios-switch" id="inputSendSwitch" role="switch" aria-checked="false" onclick="this.classList.toggle('on'); this.setAttribute('aria-checked', this.classList.contains('on'))">
+                <div class="ios-switch" id="inputSendSwitch" onclick="this.classList.toggle('on')">
                     <div class="ios-switch-thumb"></div>
                 </div>
             </div>
@@ -410,9 +421,9 @@
     </div>
 
     <!-- 分配邮箱模态框 -->
-    <div class="modal-overlay" id="assignEmailModal" aria-labelledby="assignEmailTitle">
+    <div class="modal-overlay" id="assignEmailModal">
         <div class="modal-card">
-            <h3 id="assignEmailTitle" style="font-size:18px; font-weight:700; margin-bottom:20px;">分配新邮箱</h3>
+            <h3 style="font-size:18px; font-weight:700; margin-bottom:20px;">分配新邮箱</h3>
             <p class="modal-subtext">手动指定该用户的新邮箱地址。</p>
 
             <div class="form-row">
@@ -434,9 +445,9 @@
     </div>
 
     <!-- 密码修改模态框 -->
-    <div class="modal-overlay" id="passwordModal" aria-labelledby="passwordModalTitle">
+    <div class="modal-overlay" id="passwordModal">
         <div class="modal-card" style="width: 400px;">
-            <h3 id="passwordModalTitle" style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">修改密码</h3>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">修改密码</h3>
             <p class="modal-subtext">
                 当前正在修改 <span id="pwdEditEmail" style="color: var(--accent-blue); font-weight: 500;"></span> 的密码。
             </p>
@@ -463,9 +474,9 @@
     </div>
 
     <!-- 备注编辑模态框 -->
-    <div class="modal-overlay" id="remarkModal" aria-labelledby="remarkModalTitle">
+    <div class="modal-overlay" id="remarkModal">
         <div class="modal-card" style="width: 440px;">
-            <h3 id="remarkModalTitle" style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">编辑备注</h3>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">编辑备注</h3>
             <p class="modal-subtext">
                 当前邮箱：<span id="remarkEditEmail" style="color: var(--accent-blue); font-weight: 500;"></span>
             </p>

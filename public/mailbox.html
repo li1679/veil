@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Veil - 我的邮箱</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="preconnect" href="https://unpkg.com">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="/css/icons/regular.css">
+    <link rel="stylesheet" href="/css/icons/bold.css">
+    <link rel="stylesheet" href="/css/icons/fill.css">
     <link rel="stylesheet" href="/css/styles.css">
     <style>
         body {
@@ -44,7 +45,7 @@
         </div>
 
         <!-- 操作栏 -->
-        <div class="mailbox-actions">
+        <div style="padding: 20px 40px; display: flex; gap: 12px; justify-content: center;">
             <button class="btn btn-secondary" onclick="copyMailbox()">
                 <i class="ph-bold ph-copy"></i> 复制邮箱
             </button>
@@ -77,11 +78,11 @@
     <div class="toast" id="toast"><i class="ph-bold ph-check"></i> <span id="toastMsg">成功</span></div>
 
     <!-- 发送邮件模态框 -->
-    <div class="modal-overlay" id="sendModalOverlay" aria-labelledby="sendModalTitle">
+    <div class="modal-overlay" id="sendModalOverlay">
         <div class="sheet-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeSendModal()">取消</button>
-                <div id="sendModalTitle" style="font-weight:600; font-size:16px;">新邮件</div>
+                <div style="font-weight:600; font-size:16px;">新邮件</div>
                 <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发送</button>
             </div>
             <div class="sheet-body">
@@ -99,11 +100,11 @@
     </div>
 
     <!-- 邮件详情模态框 -->
-    <div class="modal-overlay" id="mailDetailModal" aria-labelledby="mailDetailModalTitle">
+    <div class="modal-overlay" id="mailDetailModal">
         <div class="sheet-modal mail-detail-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeMailDetail()">关闭</button>
-                <div id="mailDetailModalTitle" style="font-weight:600; font-size:16px;">邮件详情</div>
+                <div style="font-weight:600; font-size:16px;">邮件详情</div>
                 <div style="width: 50px;"></div>
             </div>
             <div class="mail-detail-header">

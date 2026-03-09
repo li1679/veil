@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Veil - 临时邮箱</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="preconnect" href="https://unpkg.com">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="/css/icons/regular.css">
+    <link rel="stylesheet" href="/css/icons/bold.css">
+    <link rel="stylesheet" href="/css/icons/fill.css">
     <link rel="stylesheet" href="/css/styles.css">
     <style>
         body {
@@ -58,7 +59,7 @@
             <div class="actions-row disabled" id="actionButtons">
                 <button class="btn btn-secondary" onclick="copyEmail()"><i class="ph-bold ph-copy"></i> <span>复制</span></button>
                 <button class="btn btn-secondary" onclick="refreshInbox()"><i class="ph-bold ph-arrows-clockwise"></i> <span>刷新</span></button>
-                <button class="btn btn-primary" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发送</span></button>
+                <button class="btn btn-primary" id="sendActionBtn" style="display:none" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发送</span></button>
                 <button class="btn btn-danger" onclick="confirmClearInbox()"><i class="ph-bold ph-trash"></i> <span>清空</span></button>
             </div>
 
@@ -81,14 +82,14 @@
                                 <div style="font-size:14px; font-weight:500;">随机域名后缀</div>
                                 <div class="muted-caption">开启后每次生成都会随机选择域名</div>
                             </div>
-                            <div class="ios-switch" id="randomDomainSwitch" role="switch" aria-checked="false" tabindex="0" aria-label="切换随机域名后缀" onclick="toggleRandomDomain()">
+                            <div class="ios-switch" id="randomDomainSwitch" role="button" tabindex="0" aria-label="切换随机域名后缀" onclick="toggleRandomDomain()">
                                 <div class="ios-switch-thumb"></div>
                             </div>
                         </div>
 
                         <div style="font-size:13px; margin-bottom:6px; font-weight:500;">有效时长</div>
                         <div class="segment-container segment-4">
-                            <div class="segment-bg" id="expirySegmentBg"></div>
+                            <div class="segment-bg" id="expirySegmentBg" style="transform:translateX(100%)"></div>
                             <button class="segment-btn" onclick="setExpiry(this, '1h', 0)">1小时</button>
                             <button class="segment-btn active" onclick="setExpiry(this, '24h', 1)">1天</button>
                             <button class="segment-btn" onclick="setExpiry(this, '3d', 2)">3天</button>
@@ -143,6 +144,7 @@
                 <div id="inboxContainer" class="inbox-empty">
                     <i class="ph ph-tray"></i>
                     <span>暂无新邮件</span>
+                    <span style="font-size:12px; color:var(--label-tertiary); margin-top:4px;">每 5 秒自动刷新</span>
                 </div>
             </div>
         </div>
@@ -152,11 +154,11 @@
     <div class="toast" id="toast"><i class="ph-bold ph-check"></i> <span id="toastMsg">成功</span></div>
 
     <!-- 发送邮件模态框 -->
-    <div class="modal-overlay" id="sendModalOverlay" aria-labelledby="userSendModalTitle">
+    <div class="modal-overlay" id="sendModalOverlay">
         <div class="sheet-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeSendModal()">取消</button>
-                <div id="userSendModalTitle" style="font-weight:600; font-size:16px;">新邮件</div>
+                <div style="font-weight:600; font-size:16px;">新邮件</div>
                 <button class="sheet-btn send" id="sendBtn" onclick="doSendEmail()">发送</button>
             </div>
             <div class="sheet-body">
@@ -178,11 +180,11 @@
     </div>
 
     <!-- 邮件详情模态框 -->
-    <div class="modal-overlay" id="mailDetailModal" aria-labelledby="userMailDetailTitle">
+    <div class="modal-overlay" id="mailDetailModal">
         <div class="sheet-modal mail-detail-modal">
             <div class="sheet-header">
                 <button class="sheet-btn" onclick="closeMailDetail()">关闭</button>
-                <div id="userMailDetailTitle" style="font-weight:600; font-size:16px;">邮件详情</div>
+                <div style="font-weight:600; font-size:16px;">邮件详情</div>
                 <div style="width: 50px;"></div>
             </div>
             <div class="mail-detail-header">

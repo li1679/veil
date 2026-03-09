@@ -3,14 +3,26 @@
  * 提供基础的静态资源缓存（Stale-While-Revalidate）
  */
 
-const CACHE_NAME = 'veil-v1';
+const CACHE_NAME = 'veil-v2';
 const STATIC_ASSETS = [
     '/css/styles.css',
+    '/css/icons/regular.css',
+    '/css/icons/bold.css',
+    '/css/icons/fill.css',
+    '/css/icons/Phosphor.woff2',
+    '/css/icons/Phosphor-Bold.woff2',
+    '/css/icons/Phosphor-Fill.woff2',
     '/js/common.js',
     '/js/theme.js',
     '/js/auth.js',
     '/js/api.js',
     '/js/aurora.js',
+    '/js/inbox.js',
+    '/js/compose.js',
+    '/js/domain-selector.js',
+    '/js/admin.js',
+    '/js/user.js',
+    '/js/mailbox.js',
     '/manifest.json',
     '/favicon.svg'
 ];

@@ -180,7 +180,7 @@ function base64ToBytes(b64) {
   return bytes;
 }
 
-function timingSafeEqual(a, b) {
+export function timingSafeEqual(a, b) {
   const aa = a instanceof Uint8Array ? a : new Uint8Array(a || []);
   const bb = b instanceof Uint8Array ? b : new Uint8Array(b || []);
   if (aa.length !== bb.length) return false;
