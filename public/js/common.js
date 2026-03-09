@@ -362,7 +362,7 @@ export function sanitizeEmailHtml(inputHtml, options = {}) {
 
         const blockedTags = [
             'script', 'style', 'iframe', 'object', 'embed',
-            'link', 'meta', 'base',
+            'link', 'meta', 'base', 'noscript', 'template',
             'form', 'input', 'button', 'textarea', 'select', 'option',
             'svg', 'math'
         ];
@@ -376,12 +376,7 @@ export function sanitizeEmailHtml(inputHtml, options = {}) {
                 const name = String(attr.name || '').toLowerCase();
                 const value = String(attr.value ?? '');
 
-                if (name.startsWith('on') || name === 'srcdoc') {
-                    el.removeAttribute(attr.name);
-                    continue;
-                }
-
-                if (name === 'srcset') {
+                if (name.startsWith('on') || name === 'srcdoc' || name === 'srcset' || name === 'ping') {
                     el.removeAttribute(attr.name);
                     continue;
                 }
@@ -391,14 +386,16 @@ export function sanitizeEmailHtml(inputHtml, options = {}) {
                         el.removeAttribute(attr.name);
                         continue;
                     }
-                    const lower = value.toLowerCase();
-                    if (lower.includes('expression') || lower.includes('javascript:') || lower.includes('vbscript:')) {
+                    const lower = value.toLowerCase().replace(/\/\*[\s\S]*?\*\//g, '');
+                    if (lower.includes('expression') || lower.includes('javascript:') || lower.includes('vbscript:') ||
+                        lower.includes('url(') || lower.includes('@import') || lower.includes('-moz-binding') ||
+                        lower.includes('behavior')) {
                         el.removeAttribute(attr.name);
                     }
                     continue;
                 }
 
-                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction') {
+                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction' || name === 'action') {
                     const safe = sanitizeUrl(value, name);
                     if (!safe) el.removeAttribute(attr.name);
                     else el.setAttribute(attr.name, safe);

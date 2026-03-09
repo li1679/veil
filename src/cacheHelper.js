@@ -21,6 +21,24 @@ const CACHE_TTL = {
   clearInterval: 30 * 60 * 1000     // 每30分钟清理一次过期缓存
 };
 
+// 缓存大小上限（防止内存无限增长）
+const CACHE_MAX_SIZE = {
+  tableStructures: 50,
+  mailboxIds: 5000,
+  userQuotas: 1000,
+  systemStats: 100,
+};
+
+function evictOldest(map, maxSize) {
+  if (map.size <= maxSize) return;
+  const excess = map.size - maxSize + Math.floor(maxSize * 0.1);
+  const iter = map.keys();
+  for (let i = 0; i < excess; i++) {
+    const k = iter.next().value;
+    if (k !== undefined) map.delete(k);
+  }
+}
+
 /**
  * 获取表结构信息（带缓存）
  * @param {object} db - 数据库连接
@@ -51,6 +69,7 @@ export async function getCachedTableStructure(db, tableName) {
       data: cols,
       timestamp: Date.now()
     });
+    evictOldest(CACHE.tableStructures, CACHE_MAX_SIZE.tableStructures);
     
     return cols;
   } catch (e) {
@@ -95,6 +114,7 @@ export async function getCachedMailboxId(db, address) {
     id,
     timestamp: Date.now()
   });
+  evictOldest(CACHE.mailboxIds, CACHE_MAX_SIZE.mailboxIds);
   
   return id;
 }
@@ -112,6 +132,7 @@ export function updateMailboxIdCache(address, id) {
     id,
     timestamp: Date.now()
   });
+  evictOldest(CACHE.mailboxIds, CACHE_MAX_SIZE.mailboxIds);
 }
 
 /**
@@ -148,6 +169,7 @@ export async function getCachedUserQuota(db, userId) {
     data,
     timestamp: Date.now()
   });
+  evictOldest(CACHE.userQuotas, CACHE_MAX_SIZE.userQuotas);
   
   return data;
 }
@@ -181,6 +203,7 @@ export async function getCachedSystemStat(db, statKey, queryFn) {
     value,
     timestamp: Date.now()
   });
+  evictOldest(CACHE.systemStats, CACHE_MAX_SIZE.systemStats);
   
   return value;
 }

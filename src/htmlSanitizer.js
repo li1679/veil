@@ -3,7 +3,7 @@
 
 const BLOCKED_TAGS = [
   'script', 'style', 'iframe', 'object', 'embed',
-  'link', 'meta', 'base',
+  'link', 'meta', 'base', 'noscript', 'template',
   'form', 'input', 'button', 'textarea', 'select', 'option',
   'svg', 'math'
 ];
@@ -55,20 +55,22 @@ class ElementAttributeSanitizer {
       const lower = attrName.toLowerCase();
       const v = String(value ?? '');
 
-      if (lower.startsWith('on') || lower === 'srcdoc' || lower === 'srcset') {
+      if (lower.startsWith('on') || lower === 'srcdoc' || lower === 'srcset' || lower === 'ping') {
         element.removeAttribute(attrName);
         continue;
       }
 
       if (lower === 'style') {
-        const lv = v.toLowerCase();
-        if (lv.includes('expression') || lv.includes('javascript:') || lv.includes('vbscript:')) {
+        const lv = v.toLowerCase().replace(/\/\*[\s\S]*?\*\//g, '');
+        if (lv.includes('expression') || lv.includes('javascript:') || lv.includes('vbscript:') ||
+            lv.includes('url(') || lv.includes('@import') || lv.includes('-moz-binding') ||
+            lv.includes('behavior')) {
           element.removeAttribute(attrName);
         }
         continue;
       }
 
-      if (lower === 'href' || lower === 'src' || lower === 'xlink:href' || lower === 'formaction') {
+      if (lower === 'href' || lower === 'src' || lower === 'xlink:href' || lower === 'formaction' || lower === 'action') {
         const safe = sanitizeUrl(v, lower);
         if (!safe) element.removeAttribute(attrName);
         else if (safe !== v) element.setAttribute(attrName, safe);

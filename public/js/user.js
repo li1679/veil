@@ -91,6 +91,7 @@ function updateUserInfo() {
     const avatarEl = document.getElementById('userAvatar');
     const nameEl = document.getElementById('userName');
     const quotaEl = document.getElementById('quotaDisplay');
+    const sendBtn = document.getElementById('sendActionBtn');
 
     if (avatarEl && currentUser) {
         avatarEl.textContent = (currentUser.name || currentUser.username || 'U').substring(0, 2).toUpperCase();
@@ -100,6 +101,9 @@ function updateUserInfo() {
     }
     if (quotaEl && currentUser) {
         quotaEl.textContent = `已生成 ${currentUser.quotaUsed || 0}/${currentUser.quota || 10} 个邮箱`;
+    }
+    if (sendBtn) {
+        sendBtn.style.display = canSend(currentUser) ? '' : 'none';
     }
 }
 

@@ -26,6 +26,7 @@ let users = [];
 let allMailboxes = [];
 let selectedUserIds = new Set();
 let selectedEmailIds = new Set();
+let selectedExpiry = '24h';
 let viewerMailbox = null;
 let viewerEmails = [];
 let allMailboxesLoadController = null;
@@ -246,6 +247,17 @@ window.switchView = function(viewName) {
 };
 
 // ============================================
+// 过期时间选择
+// ============================================
+window.setExpiry = function(btn, value, index) {
+    selectedExpiry = value;
+    const container = btn.parentElement;
+    container.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    container.querySelector('.segment-bg').style.transform = `translateX(${index * 100}%)`;
+};
+
+// ============================================
 // 生成邮箱
 // ============================================
 window.generateEmail = async function() {
@@ -261,9 +273,9 @@ window.generateEmail = async function() {
                 showToast('请输入前缀');
                 return;
             }
-            response = await mailboxAPI.create(prefix, domain);
+            response = await mailboxAPI.create(prefix, domain, selectedExpiry);
         } else {
-            response = await mailboxAPI.generate(domain, prefixMode, prefixLength);
+            response = await mailboxAPI.generate(domain, prefixMode, prefixLength, selectedExpiry);
         }
 
         if (response && response.address) {

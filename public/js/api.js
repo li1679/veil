@@ -66,6 +66,8 @@ function normalizeMailboxResponse(response) {
 }
 
 function normalizeUserRole(role) {
+    const r = String(role || '').trim().toLowerCase();
+    if (r === 'admin') return 'Admin';
     return 'User';
 }
 

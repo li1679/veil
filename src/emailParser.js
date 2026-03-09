@@ -166,13 +166,13 @@ function splitMultipart(body, boundary) {
 }
 
 /**
- * 根据传输编码解码邮件正文
+ * 将传输编码的正文解码为原始字节
  * @param {string} body - 编码的正文内容
  * @param {string} transferEncoding - 传输编码类型（base64、quoted-printable等）
- * @returns {string} 解码后的正文内容
+ * @returns {Uint8Array} 解码后的原始字节
  */
-function decodeBody(body, transferEncoding) {
-  if (!body) return '';
+function decodeTransferEncodingToBytes(body, transferEncoding) {
+  if (!body) return new Uint8Array(0);
   const enc = transferEncoding.trim();
   if (enc === 'base64') {
     const cleaned = body.replace(/\s+/g, '');
@@ -180,52 +180,54 @@ function decodeBody(body, transferEncoding) {
       const bin = atob(cleaned);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      try {
-        return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-      } catch (_) {
-        return bin;
-      }
+      return bytes;
     } catch (_) {
-      return body;
+      return new TextEncoder().encode(body);
     }
   }
   if (enc === 'quoted-printable') {
-    return decodeQuotedPrintable(body);
+    return decodeQuotedPrintableToBytes(body);
   }
-  // 7bit/8bit/binary 直接返回
-  return body;
+  // 7bit/8bit/binary: 按 latin1 映射每个字符到一个字节
+  const bytes = new Uint8Array(body.length);
+  for (let i = 0; i < body.length; i++) bytes[i] = body.charCodeAt(i) & 0xFF;
+  return bytes;
 }
 
 /**
  * 根据Content-Type中的charset和传输编码解码正文
+ * 先将传输编码解码为原始字节，再按正确的charset解码为字符串
  * @param {string} body - 编码的正文内容
  * @param {string} transferEncoding - 传输编码类型
  * @param {string} contentType - Content-Type头部值，包含charset信息
  * @returns {string} 解码后的正文内容
  */
 function decodeBodyWithCharset(body, transferEncoding, contentType) {
-  const decodedRaw = decodeBody(body, transferEncoding);
-  // base64/qp 已按 utf-8 解码为字符串；若 charset 指定为 gbk/gb2312 等，尝试再次按该编码解码
+  if (!body) return '';
   const m = /charset\s*=\s*"?([^";]+)/i.exec(contentType || '');
   const charset = (m && m[1] ? m[1].trim().toLowerCase() : '') || 'utf-8';
-  if (!decodedRaw) return '';
-  if (charset === 'utf-8' || charset === 'utf8' || charset === 'us-ascii') return decodedRaw;
+
+  const rawBytes = decodeTransferEncodingToBytes(body, transferEncoding);
+  if (rawBytes.length === 0) return '';
+
   try {
-    // 将字符串转回字节再按指定编码解码；Cloudflare 运行时支持常见编码（utf-8、iso-8859-1）。
-    // 对于 gbk/gb2312 可能不被支持，则直接返回已得到的字符串。
-    const bytes = new Uint8Array(decodedRaw.split('').map(c => c.charCodeAt(0)));
-    return new TextDecoder(charset, { fatal: false }).decode(bytes);
+    return new TextDecoder(charset, { fatal: false }).decode(rawBytes);
   } catch (_) {
-    return decodedRaw;
+    // Charset not supported (e.g. gbk on some runtimes), fall back to UTF-8
+    try {
+      return new TextDecoder('utf-8', { fatal: false }).decode(rawBytes);
+    } catch (_) {
+      return body;
+    }
   }
 }
 
 /**
- * 解码Quoted-Printable编码的内容
+ * 解码Quoted-Printable编码的内容为原始字节
  * @param {string} input - Quoted-Printable编码的字符串
- * @returns {string} 解码后的字符串
+ * @returns {Uint8Array} 解码后的原始字节
  */
-function decodeQuotedPrintable(input) {
+function decodeQuotedPrintableToBytes(input) {
   let s = input.replace(/=\r?\n/g, '');
   const bytes = [];
   for (let i = 0; i < s.length; i++) {
@@ -238,13 +240,9 @@ function decodeQuotedPrintable(input) {
         continue;
       }
     }
-    bytes.push(ch.charCodeAt(0));
+    bytes.push(ch.charCodeAt(0) & 0xFF);
   }
-  try {
-    return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes));
-  } catch (_) {
-    return s;
-  }
+  return new Uint8Array(bytes);
 }
 
 /**

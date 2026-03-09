@@ -191,11 +191,14 @@ export async function authMiddleware(context) {
       request.headers.get('X-Api-Key') ||
       '';
 
-    if (providedKey && providedKey === expectedKey) {
-      // 仅用于 /api/public/*：不开放其它受保护接口
-      // 为了保持系统角色模型简单，这里沿用既有角色（user），但 userId 固定为 0。
-      context.authPayload = { role: 'user', username: '__api_key__', userId: 0 };
-      return null;
+    if (providedKey) {
+      const encoder = new TextEncoder();
+      const providedBytes = encoder.encode(providedKey);
+      const expectedBytes = encoder.encode(expectedKey);
+      if (providedBytes.length === expectedBytes.length && timingSafeEqual(providedBytes, expectedBytes)) {
+        context.authPayload = { role: 'user', username: '__api_key__', userId: 0 };
+        return null;
+      }
     }
 
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -243,6 +246,13 @@ async function verifyJwtWithCache(jwtSecret, cookieHeader) {
     payload = jwtSecret ? await verifyJwt(jwtSecret, cookieHeader) : false;
     if (token && payload) {
       globalThis.__JWT_CACHE__.set(token, { payload, exp: now + 30 * 60 * 1000 });
+      if (globalThis.__JWT_CACHE__.size > 500) {
+        const iter = globalThis.__JWT_CACHE__.keys();
+        for (let i = 0; i < 50; i++) {
+          const k = iter.next().value;
+          if (k !== undefined) globalThis.__JWT_CACHE__.delete(k);
+        }
+      }
     }
   }
 
@@ -262,8 +272,18 @@ function checkRootAdminOverride(request, rootAdminToken) {
     const auth = request.headers.get('Authorization') || request.headers.get('authorization') || '';
     const xToken = request.headers.get('X-Admin-Token') || request.headers.get('x-admin-token') || '';
     const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-    if (bearer && bearer === rootAdminToken) return { role: 'admin', username: '__root__', userId: 0 };
-    if (xToken && xToken === rootAdminToken) return { role: 'admin', username: '__root__', userId: 0 };
+    const encoder = new TextEncoder();
+    const tokenBytes = encoder.encode(rootAdminToken);
+    if (bearer) {
+      const bearerBytes = encoder.encode(bearer);
+      if (bearerBytes.length === tokenBytes.length && timingSafeEqual(bearerBytes, tokenBytes))
+        return { role: 'admin', username: '__root__', userId: 0 };
+    }
+    if (xToken) {
+      const xTokenBytes = encoder.encode(xToken);
+      if (xTokenBytes.length === tokenBytes.length && timingSafeEqual(xTokenBytes, tokenBytes))
+        return { role: 'admin', username: '__root__', userId: 0 };
+    }
     return null;
   } catch (_) {
     return null;
@@ -538,7 +558,13 @@ export function createRouter() {
       const auth = request.headers.get('Authorization') || '';
       const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
       const xToken = request.headers.get('X-Receive-Token') || '';
-      if (bearer !== RECEIVE_TOKEN && xToken !== RECEIVE_TOKEN) {
+      const encoder = new TextEncoder();
+      const tokenBytes = encoder.encode(RECEIVE_TOKEN);
+      const bearerBytes = encoder.encode(bearer);
+      const xTokenBytes = encoder.encode(xToken);
+      const bearerMatch = bearerBytes.length === tokenBytes.length && timingSafeEqual(bearerBytes, tokenBytes);
+      const xTokenMatch = xTokenBytes.length === tokenBytes.length && timingSafeEqual(xTokenBytes, tokenBytes);
+      if (!bearerMatch && !xTokenMatch) {
         return new Response('Unauthorized', { status: 401 });
       }
     }

@@ -59,7 +59,7 @@
             <div class="actions-row disabled" id="actionButtons">
                 <button class="btn btn-secondary" onclick="copyEmail()"><i class="ph-bold ph-copy"></i> <span>复制</span></button>
                 <button class="btn btn-secondary" onclick="refreshInbox()"><i class="ph-bold ph-arrows-clockwise"></i> <span>刷新</span></button>
-                <button class="btn btn-primary" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发送</span></button>
+                <button class="btn btn-primary" id="sendActionBtn" style="display:none" onclick="openSendModal()"><i class="ph-bold ph-paper-plane-tilt"></i> <span>发送</span></button>
                 <button class="btn btn-danger" onclick="confirmClearInbox()"><i class="ph-bold ph-trash"></i> <span>清空</span></button>
             </div>
 
@@ -89,7 +89,7 @@
 
                         <div style="font-size:13px; margin-bottom:6px; font-weight:500;">有效时长</div>
                         <div class="segment-container segment-4">
-                            <div class="segment-bg" id="expirySegmentBg"></div>
+                            <div class="segment-bg" id="expirySegmentBg" style="transform:translateX(100%)"></div>
                             <button class="segment-btn" onclick="setExpiry(this, '1h', 0)">1小时</button>
                             <button class="segment-btn active" onclick="setExpiry(this, '24h', 1)">1天</button>
                             <button class="segment-btn" onclick="setExpiry(this, '3d', 2)">3天</button>

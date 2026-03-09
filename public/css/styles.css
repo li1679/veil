@@ -648,6 +648,7 @@ body.app-mode #app-view {
     background: var(--surface-control); border-radius: 7px; box-shadow: var(--shadow-knob);
     transition: transform 0.3s var(--ease-bounce); z-index: 0;
 }
+.segment-4 > .segment-bg { width: calc(25% - 2px); }
 
 .custom-input {
     width: 100%; padding: 10px 12px; border: 1px solid var(--ios-separator-light); border-radius: var(--r-sm);
