@@ -104,6 +104,34 @@ function applyMailboxDeletionsToHome(addresses = []) {
 // ============================================
 const domainSelector = createDomainSelector({ domainAPI });
 
+function getAvailableDomains() {
+    return domainSelector
+        .getDomains()
+        .map((domain) => String(domain || '').trim())
+        .filter(Boolean);
+}
+
+function renderDomainOptions(selectEl, preferredValue = '') {
+    if (!selectEl) return;
+
+    const availableDomains = getAvailableDomains();
+    if (availableDomains.length === 0) {
+        selectEl.innerHTML = '';
+        return;
+    }
+
+    const currentValue = String(preferredValue || selectEl.value || '').trim();
+    const selectedValue = availableDomains.includes(currentValue)
+        ? currentValue
+        : availableDomains[0];
+
+    selectEl.innerHTML = availableDomains.map((domain) => {
+        const safeDomain = escapeHtml(domain);
+        const selectedAttr = domain === selectedValue ? ' selected' : '';
+        return `<option value="${safeDomain}"${selectedAttr}>${safeDomain}</option>`;
+    }).join('');
+}
+
 async function loadInbox() {
     if (!currentEmail) return;
     try {
@@ -833,7 +861,7 @@ window.openUserModal = function() {
 
     // 填充域名下拉框
     const domainSelect = document.getElementById('inputInitialDomain');
-    domainSelect.innerHTML = domains.map(d => `<option value="${d}">${d}</option>`).join('');
+    renderDomainOptions(domainSelect, domainSelector.getSelectedDomain());
 
     openModal('userModal');
 };
@@ -919,7 +947,7 @@ window.openAssignModal = function(userId) {
     document.getElementById('assignPrefix').value = '';
 
     const domainSelect = document.getElementById('assignDomain');
-    domainSelect.innerHTML = domains.map(d => `<option value="${d}">${d}</option>`).join('');
+    renderDomainOptions(domainSelect, domainSelector.getSelectedDomain());
 
     openModal('assignEmailModal');
 };
@@ -1024,8 +1052,12 @@ function renderDomainFilter() {
     if (!filter) return;
 
     const currentValue = filter.value;
+    const availableDomains = getAvailableDomains();
     filter.innerHTML = '<option value="">全部域名</option>' +
-        domains.map(d => `<option value="${d}" ${d === currentValue ? 'selected' : ''}>${d}</option>`).join('');
+        availableDomains.map((domain) => {
+            const safeDomain = escapeHtml(domain);
+            return `<option value="${safeDomain}" ${domain === currentValue ? 'selected' : ''}>${safeDomain}</option>`;
+        }).join('');
 }
 
 function renderAllMailboxes() {
