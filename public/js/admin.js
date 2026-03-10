@@ -53,6 +53,10 @@ function normalizeEmailAddress(address) {
     return String(address || '').trim().toLowerCase();
 }
 
+function getMailboxViewerPreviewText(email) {
+    return String(email?.text || email?.preview || '').trim();
+}
+
 function clearCurrentEmailState() {
     currentEmail = null;
     removeStorage(getLastMailboxStorageKey());
@@ -1271,7 +1275,7 @@ function renderMailboxViewer(emails) {
         list.innerHTML = viewerEmails.map(email => {
             const fromRaw = email.from_name || email.from_address || 'U';
             const subjectRaw = email.subject || '(无主题)';
-            const previewRaw = getEmailPreviewText(email).slice(0, 120);
+            const previewRaw = getMailboxViewerPreviewText(email).slice(0, 120);
             const avatarChar = String(fromRaw || 'U').trim().charAt(0).toUpperCase();
             return `
                 <div class="mail-item" role="button" tabindex="0" data-action="open-viewer-mail-detail" data-id="${email.id}">
