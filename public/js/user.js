@@ -7,8 +7,7 @@ import { domainAPI, mailboxAPI, emailAPI, quotaAPI } from './api.js';
 import { requireUser, logout, canSend } from './auth.js';
 import {
     showToast, copyText, openModal, closeModal, openIOSAlert,
-    animateDelete, initCommon, formatTime, escapeHtml,
-    getStorage, setStorage, removeStorage
+    animateDelete, initCommon, formatTime, escapeHtml
 } from './common.js';
 import { createInboxController } from './inbox.js';
 import { createComposeController } from './compose.js';
@@ -24,11 +23,6 @@ let selectedExpiry = '24h';
 
 const LIST_FETCH_LIMIT = 50;
 const MAX_LIST_FETCH_PAGES = 200;
-
-function getLastMailboxStorageKey() {
-    const username = currentUser?.username ? String(currentUser.username) : 'unknown';
-    return `veil_last_mailbox_user_${username}`;
-}
 
 // ============================================
 // 收件箱加载（user 专用）
@@ -179,7 +173,6 @@ window.generateEmail = async function() {
 
 function setCurrentEmail(email) {
     currentEmail = email;
-    setStorage(getLastMailboxStorageKey(), email);
     const parts = email.split('@');
     document.getElementById('prefixText').textContent = parts[0];
     document.getElementById('suffixText').textContent = '@' + parts[1];
@@ -209,23 +202,10 @@ async function loadHistory() {
             emailCount: m.email_count || 0,
             pinned: false
         }));
-
-        const last = getStorage(getLastMailboxStorageKey(), null);
-        const lastEmail = typeof last === 'string' ? last.trim() : '';
-        if (lastEmail && lastEmail.includes('@') && !emailHistory.some((h) => h.email === lastEmail)) {
-            emailHistory.unshift({
-                id: Date.now(),
-                email: lastEmail,
-                time: '上次使用',
-                emailCount: 0,
-                pinned: false
-            });
-        }
         renderHistory();
 
         if (emailHistory.length > 0) {
-            const preferred = lastEmail && emailHistory.some((h) => h.email === lastEmail) ? lastEmail : emailHistory[0].email;
-            restoreEmail(preferred);
+            restoreEmail(emailHistory[0].email);
         }
     } catch (error) {
         console.error('Failed to load history:', error);
@@ -309,7 +289,6 @@ window.confirmDeleteHistory = function(id) {
 
                     if (currentEmail === item.email) {
                         currentEmail = null;
-                        removeStorage(getLastMailboxStorageKey());
                         document.getElementById('fullEmailDisplay').classList.remove('visible');
                         document.getElementById('actionButtons').classList.add('disabled');
                         inbox.stopInboxPoll();
@@ -335,7 +314,6 @@ window.confirmClearHistory = function() {
             await mailboxAPI.clearAll();
             emailHistory = [];
             currentEmail = null;
-            removeStorage(getLastMailboxStorageKey());
             document.getElementById('fullEmailDisplay').classList.remove('visible');
             document.getElementById('actionButtons').classList.add('disabled');
             inbox.stopInboxPoll();

@@ -138,24 +138,6 @@ async function performFirstTimeSetup(db) {
 
   await ensureSchema(db);
 
-  // 补齐历史数据：为已存在的邮箱回填创建者（取最早绑定该邮箱的用户）
-  try {
-    await db.exec(`
-      UPDATE mailboxes
-      SET created_by_user_id = (
-        SELECT um.user_id
-        FROM user_mailboxes um
-        WHERE um.mailbox_id = mailboxes.id
-        ORDER BY datetime(um.created_at) ASC
-        LIMIT 1
-      )
-      WHERE created_by_user_id IS NULL
-        AND EXISTS (SELECT 1 FROM user_mailboxes um2 WHERE um2.mailbox_id = mailboxes.id);
-    `);
-  } catch (_) {
-    // ignore
-  }
-
   // 创建索引
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_mailboxes_address ON mailboxes(address);`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_mailboxes_is_pinned ON mailboxes(is_pinned DESC);`);
@@ -793,14 +775,6 @@ export async function assignMailboxToUser(db, { userId = null, username = null, 
 
   // 绑定（唯一约束避免重复）
   await db.prepare('INSERT OR IGNORE INTO user_mailboxes (user_id, mailbox_id) VALUES (?, ?)').bind(uid, mailboxId).run();
-
-  // 为历史/外部创建的邮箱补齐创建者（不覆盖已有值）
-  try {
-    await db.prepare('UPDATE mailboxes SET created_by_user_id = COALESCE(created_by_user_id, ?) WHERE id = ?')
-      .bind(uid, mailboxId).run();
-  } catch (_) {
-    // ignore
-  }
   
   // 使缓存失效，下次查询时会重新获取
   invalidateUserQuotaCache(uid);
