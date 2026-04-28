@@ -31,8 +31,6 @@ let viewerEmails = [];
 let allMailboxesLoadController = null;
 let allMailboxesLoadSeq = 0;
 let expandedEmailDetails = new Set();
-const HISTORY_FETCH_LIMIT = 50;
-const HISTORY_MAX_PAGES = 200;
 const DEFAULT_ALL_MAILBOX_PAGE_SIZE = 50;
 const ALL_MAILBOX_PAGE_SIZE_OPTIONS = [20, 50, 100];
 const allMailboxesPageState = {
@@ -321,16 +319,8 @@ function setCurrentEmail(email) {
 // ============================================
 async function loadHistory() {
     try {
-        // 拉全量历史（分页拉取，避免“删一条后不补位”）
-        let mailboxes = [];
-        for (let page = 0; page < HISTORY_MAX_PAGES; page += 1) {
-            const offset = page * HISTORY_FETCH_LIMIT;
-            const response = await mailboxAPI.getMailboxes({ scope: 'own', limit: HISTORY_FETCH_LIMIT, offset });
-            const batch = (response.mailboxes || []);
-            if (batch.length === 0) break;
-            mailboxes = mailboxes.concat(batch);
-            if (batch.length < HISTORY_FETCH_LIMIT) break;
-        }
+        const response = await mailboxAPI.getMailboxes({ scope: 'own' });
+        const mailboxes = response.mailboxes || [];
 
         emailHistory = mailboxes.map(m => ({
             id: m.id,

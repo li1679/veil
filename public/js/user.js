@@ -21,9 +21,6 @@ let currentEmail = null;
 let emailHistory = [];
 let selectedExpiry = '24h';
 
-const LIST_FETCH_LIMIT = 50;
-const MAX_LIST_FETCH_PAGES = 200;
-
 // ============================================
 // 收件箱加载（user 专用）
 // ============================================
@@ -185,15 +182,8 @@ function setCurrentEmail(email) {
 // ============================================
 async function loadHistory() {
     try {
-        let mailboxes = [];
-        for (let page = 0; page < MAX_LIST_FETCH_PAGES; page += 1) {
-            const offset = page * LIST_FETCH_LIMIT;
-            const response = await mailboxAPI.getMailboxes({ limit: LIST_FETCH_LIMIT, offset });
-            const batch = (response.mailboxes || []);
-            if (batch.length === 0) break;
-            mailboxes = mailboxes.concat(batch);
-            if (batch.length < LIST_FETCH_LIMIT) break;
-        }
+        const response = await mailboxAPI.getMailboxes();
+        const mailboxes = response.mailboxes || [];
 
         emailHistory = mailboxes.map(m => ({
             id: m.id,
