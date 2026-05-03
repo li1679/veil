@@ -47,13 +47,11 @@ export async function ttlCleanup(db, r2, options = {}) {
 
       try {
         // 2.1 分页删除该邮箱所有消息对应的 R2 对象（避免仅删前 N 条导致长期残留）
-        let r2DeletionOk = true;
         if (r2) {
           let lastMessageId = 0;
           while (true) {
             if (Date.now() - startTime > maxRuntime) {
               stats.errors.push('Reached max runtime while deleting R2 objects, stopping early');
-              r2DeletionOk = false;
               break;
             }
 
@@ -82,7 +80,6 @@ export async function ttlCleanup(db, r2, options = {}) {
                   await r2.delete(key);
                   stats.deletedR2Objects++;
                 } catch (e) {
-                  r2DeletionOk = false;
                   stats.errors.push(`R2 delete failed: ${key}`);
                 }
               }
@@ -90,23 +87,18 @@ export async function ttlCleanup(db, r2, options = {}) {
           }
         }
 
-        // R2 删除未完成/失败：保留数据库记录，避免丢失 object_key 导致无法重试
-        if (!r2DeletionOk) {
-          continue;
-        }
-
-        // 2.3 删除消息记录
+        // 2.2 删除消息记录
         const deleteResult = await db.prepare(`
           DELETE FROM messages WHERE mailbox_id = ?
         `).bind(mailboxId).run();
         stats.deletedMessages += deleteResult?.meta?.changes || 0;
 
-        // 2.4 删除用户邮箱关联
+        // 2.3 删除用户邮箱关联
         await db.prepare(`
           DELETE FROM user_mailboxes WHERE mailbox_id = ?
         `).bind(mailboxId).run();
 
-        // 2.5 删除邮箱记录
+        // 2.4 删除邮箱记录
         await db.prepare(`
           DELETE FROM mailboxes WHERE id = ?
         `).bind(mailboxId).run();
